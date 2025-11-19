@@ -19,8 +19,9 @@ namespace BNG
         [Tooltip("Расстояние, при котором объект прикрепляется")]
         public float SnapDistance = 0.15f;
 
-        private GameObject currentObject;
-        private Transform activeInsertPoint;
+        // Словарь для отслеживания занятости каждого сокета
+        private Dictionary<Transform, GameObject> occupiedSockets = new Dictionary<Transform, GameObject>();
+
         private Vector3 originalScale;
 
         void OnTriggerStay(Collider other) {
@@ -29,13 +30,16 @@ namespace BNG
             // Проверяем, можно ли крепить этот объект
             if (!IsAllowedObject(obj)) return;
 
-            // Если ничего не вставлено, ищем ближайшую точку
-            if (currentObject == null) {
-                Transform nearestPoint = GetNearestInsertPoint(obj.transform.position);
+            // Проверяем, не вставлен ли уже этот объект в какой-то сокет
+            bool isAlreadyAttached = occupiedSockets.ContainsValue(obj);
+
+            if (!isAlreadyAttached) {
+                // Ищем ближайшую СВОБОДНУЮ точку
+                Transform nearestPoint = GetNearestFreeInsertPoint(obj.transform.position);
 
                 if (nearestPoint != null && Vector3.Distance(obj.transform.position, nearestPoint.position) < SnapDistance) {
-                    currentObject = obj;
-                    activeInsertPoint = nearestPoint;
+                    // Занимаем сокет
+                    occupiedSockets[nearestPoint] = obj;
                     originalScale = obj.transform.localScale;
 
                     // Отключаем физику, чтобы не дрожало
@@ -43,21 +47,22 @@ namespace BNG
                     if (rb != null)
                         rb.isKinematic = true;
 
-                    Debug.Log($"{name}: {obj.name} вставлен в {activeInsertPoint.name}");
+                    Debug.Log($"{name}: {obj.name} вставлен в {nearestPoint.name}");
                 }
             }
 
-            // Если объект уже вставлен — плавно притягиваем
-            if (obj == currentObject) {
+            // Если объект уже вставлен — плавно притягиваем к его сокету
+            Transform attachedSocket = GetSocketForObject(obj);
+            if (attachedSocket != null) {
                 obj.transform.position = Vector3.Lerp(
                     obj.transform.position,
-                    activeInsertPoint.position,
+                    attachedSocket.position,
                     Time.deltaTime * SnapSpeed
                 );
 
                 obj.transform.rotation = Quaternion.Lerp(
                     obj.transform.rotation,
-                    activeInsertPoint.rotation,
+                    attachedSocket.rotation,
                     Time.deltaTime * SnapSpeed
                 );
 
@@ -69,16 +74,30 @@ namespace BNG
         void OnTriggerExit(Collider other) {
             GameObject obj = other.gameObject;
 
-            if (obj == currentObject) {
+            // Находим сокет, в котором был этот объект
+            Transform socketToFree = GetSocketForObject(obj);
+
+            if (socketToFree != null) {
+                // Освобождаем сокет
+                occupiedSockets.Remove(socketToFree);
+
                 Rigidbody rb = obj.GetComponent<Rigidbody>();
                 if (rb != null)
                     rb.isKinematic = false;
 
-                currentObject = null;
-                activeInsertPoint = null;
-
-                Debug.Log($"{name}: {obj.name} удалён из сокета");
+                Debug.Log($"{name}: {obj.name} удалён из сокета {socketToFree.name}");
             }
+        }
+
+        /// <summary>
+        /// Возвращает сокет, в который вставлен данный объект (если есть).
+        /// </summary>
+        Transform GetSocketForObject(GameObject obj) {
+            foreach (var kvp in occupiedSockets) {
+                if (kvp.Value == obj)
+                    return kvp.Key;
+            }
+            return null;
         }
 
         /// <summary>
@@ -99,9 +118,9 @@ namespace BNG
         }
 
         /// <summary>
-        /// Возвращает ближайшую точку крепления к указанной позиции.
+        /// Возвращает ближайшую СВОБОДНУЮ точку крепления к указанной позиции.
         /// </summary>
-        Transform GetNearestInsertPoint(Vector3 position) {
+        Transform GetNearestFreeInsertPoint(Vector3 position) {
             if (InsertPoints == null || InsertPoints.Count == 0)
                 return null;
 
@@ -110,6 +129,10 @@ namespace BNG
 
             foreach (Transform point in InsertPoints) {
                 if (point == null) continue;
+
+                // ВАЖНО: Пропускаем занятые сокеты
+                if (occupiedSockets.ContainsKey(point))
+                    continue;
 
                 float dist = Vector3.Distance(position, point.position);
                 if (dist < minDist) {
