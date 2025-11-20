@@ -1,4 +1,3 @@
-
 Shader "Custom/IRVisibleParticle"
 {
     Properties
@@ -13,7 +12,7 @@ Shader "Custom/IRVisibleParticle"
     Category
     {
         Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" "PreviewType"="Plane" }
-        Blend SrcAlpha OneMinusSrcAlpha
+        Blend SrcAlpha One
         ColorMask RGB
         Cull Off
         Lighting Off
@@ -64,21 +63,22 @@ Shader "Custom/IRVisibleParticle"
 
                 fixed4 frag (v2f i) : SV_Target
                 {
-                    fixed4 col = tex2D(_MainTex, i.texcoord) * i.color;
+                    // Получаем текстуру частицы
+                    fixed4 texColor = tex2D(_MainTex, i.texcoord);
                     
-                    // В обычном режиме частицы почти невидимы или полностью невидимы
-                    fixed4 normalColor = col * _TintColor * _NormalVisibility;
-                    
-                    // В ИК-режиме частицы ярко светятся
-                    fixed4 irColor = col * _IRColor * _IRIntensity;
-                    
-                    // Смешиваем в зависимости от того, включен ли ночной режим
-                    // Это будет управляться через глобальную переменную шейдера
-                    float irActive = _NormalVisibility < 0.5 ? 1.0 : 0.0;
-                    
-                    fixed4 finalColor = lerp(normalColor, irColor, irActive);
-                    
-                    return finalColor;
+                    // КРИТИЧНО: Если NormalVisibility близка к 0, делаем частицу полностью прозрачной
+                    if (_NormalVisibility < 0.01)
+                    {
+                        // В обычном режиме возвращаем полностью прозрачный цвет
+                        return fixed4(0, 0, 0, 0);
+                    }
+                    else
+                    {
+                        // В ИК-режиме (_NormalVisibility устанавливается в 1)
+                        // частицы ярко светятся
+                        fixed4 irColor = texColor * i.color * _IRColor * _IRIntensity;
+                        return irColor;
+                    }
                 }
                 ENDCG
             }

@@ -84,8 +84,8 @@ namespace BNG
             var main = LeakParticles.main;
             main.startLifetime = 2f;
             main.startSpeed = 1.5f;
-            main.startSize = 0.1f;
-            main.startColor = Color.white;
+            main.startSize = 0.3f; // УВЕЛИЧЕНО с 0.1 до 0.3
+            main.startColor = new Color(1f, 1f, 1f, 1f); // ПОЛНОСТЬЮ НЕПРОЗРАЧНЫЙ
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = 1000;
 
@@ -105,6 +105,13 @@ namespace BNG
 
             var renderer = LeakParticles.GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.material = new Material(Shader.Find("Particles/Standard Unlit"));
+            renderer.material.SetColor("_Color", Color.white);
+            
+            Debug.Log($"[PatchableHole] Configured leak particles for {gameObject.name}");
+            Debug.Log($"  Start Size: {main.startSize}");
+            Debug.Log($"  Start Color: {main.startColor}");
+            Debug.Log($"  Emission Rate: {leakEmissionRate}");
         }
 
         // Метод увеличения прогресса

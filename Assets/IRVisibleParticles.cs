@@ -19,7 +19,7 @@ namespace BNG
         
         [Tooltip("Видимость в обычном режиме (0 = невидимо, 1 = полностью видимо)")]
         [Range(0f, 1f)]
-        public float normalVisibility = 0.05f;
+        public float normalVisibility = 0.0f;
         
         [Header("Particle Settings")]
         [Tooltip("Автоматически играть при включении ИК-режима")]
@@ -27,6 +27,10 @@ namespace BNG
         
         [Tooltip("Автоматически останавливать при выключении ИК-режима")]
         public bool autoStopOnIRInactive = false;
+        
+        [Header("Alternative Method")]
+        [Tooltip("Использовать простое отключение рендера вместо шейдера (рекомендуется если шейдер не работает)")]
+        public bool useSimpleVisibility = true;
         
         private ParticleSystem particles;
         private ParticleSystemRenderer particleRenderer;
@@ -38,6 +42,9 @@ namespace BNG
             particles = GetComponent<ParticleSystem>();
             particleRenderer = GetComponent<ParticleSystemRenderer>();
             
+            Debug.Log($"[IRVisibleParticles] START on {gameObject.name}");
+            Debug.Log($"[IRVisibleParticles] Particles: {particles != null}, Renderer: {particleRenderer != null}");
+            
             // Создаем материал для частиц
             SetupIRMaterial();
             
@@ -45,7 +52,9 @@ namespace BNG
             SetVisibility(false);
             
             // Если ИК-режим уже активен, обновляем
-            if (Shader.GetGlobalFloat("_IRModeActive") > 0.5f)
+            float irMode = Shader.GetGlobalFloat("_IRModeActive");
+            Debug.Log($"[IRVisibleParticles] Global IR Mode on start: {irMode}");
+            if (irMode > 0.5f)
             {
                 SetVisibility(true);
             }
@@ -54,6 +63,26 @@ namespace BNG
         void SetupIRMaterial()
         {
             if (particleRenderer == null) return;
+            
+            if (useSimpleVisibility)
+            {
+                // Простой метод - используем стандартный яркий материал
+                Shader unlitShader = Shader.Find("Particles/Standard Unlit");
+                if (unlitShader != null)
+                {
+                    Material simpleMat = new Material(unlitShader);
+                    simpleMat.SetColor("_Color", irGlowColor);
+                    simpleMat.EnableKeyword("_EMISSION");
+                    simpleMat.SetColor("_EmissionColor", irGlowColor * irIntensity);
+                    particleRenderer.material = simpleMat;
+                    particleMaterial = simpleMat;
+                    Debug.Log($"[IRVisibleParticles] Using simple Unlit material on {gameObject.name}");
+                }
+                
+                // Начинаем с выключенным рендером
+                particleRenderer.enabled = false;
+                return;
+            }
             
             // Создаем материал с нашим шейдером
             Shader irShader = Shader.Find("Custom/IRVisibleParticle");
@@ -66,10 +95,14 @@ namespace BNG
                 particleMaterial.SetColor("_IRColor", irGlowColor);
                 particleMaterial.SetFloat("_IRIntensity", irIntensity);
                 particleMaterial.SetFloat("_NormalVisibility", normalVisibility);
+                
+                Debug.Log($"[IRVisibleParticles] Material setup complete on {gameObject.name}");
             }
             else
             {
-                Debug.LogWarning("IRVisibleParticles: Shader 'Custom/IRVisibleParticle' not found!");
+                Debug.LogWarning($"[IRVisibleParticles] Shader 'Custom/IRVisibleParticle' not found on {gameObject.name}! Using simple visibility.");
+                useSimpleVisibility = true;
+                SetupIRMaterial(); // Рекурсивно вызываем с simple visibility
             }
         }
         
@@ -78,24 +111,53 @@ namespace BNG
         /// </summary>
         public void SetVisibility(bool irActive)
         {
+            Debug.Log($"[IRVisibleParticles] SetVisibility({irActive}) called on {gameObject.name}");
+            
             isIRActive = irActive;
             
-            if (particleMaterial != null)
+            if (useSimpleVisibility)
             {
-                // Обновляем видимость в материале
-                particleMaterial.SetFloat("_NormalVisibility", irActive ? 1f : normalVisibility);
+                // Простой метод - включаем/выключаем рендер
+                if (particleRenderer != null)
+                {
+                    particleRenderer.enabled = irActive;
+                    Debug.Log($"[IRVisibleParticles] Renderer.enabled = {irActive} on {gameObject.name}");
+                }
+                else
+                {
+                    Debug.LogError($"[IRVisibleParticles] ParticleRenderer is NULL on {gameObject.name}!");
+                }
+            }
+            else
+            {
+                // Метод через шейдер
+                if (particleMaterial != null)
+                {
+                    // Обновляем видимость в материале
+                    // 0 = невидимо, 1 = видимо в ИК-режиме
+                    particleMaterial.SetFloat("_NormalVisibility", irActive ? 1f : 0f);
+                    Debug.Log($"[IRVisibleParticles] Material _NormalVisibility = {(irActive ? 1f : 0f)} on {gameObject.name}");
+                }
             }
             
             // Управляем воспроизведением частиц
             if (particles != null)
             {
-                if (irActive && autoPlayOnIRActive && !particles.isPlaying)
+                if (irActive && autoPlayOnIRActive)
                 {
-                    particles.Play();
+                    if (!particles.isPlaying)
+                    {
+                        particles.Play();
+                        Debug.Log($"[IRVisibleParticles] Particles.Play() on {gameObject.name}");
+                    }
                 }
-                else if (!irActive && autoStopOnIRInactive && particles.isPlaying)
+                else if (!irActive && autoStopOnIRInactive)
                 {
-                    particles.Stop();
+                    if (particles.isPlaying)
+                    {
+                        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                        Debug.Log($"[IRVisibleParticles] Particles.Stop() on {gameObject.name}");
+                    }
                 }
             }
         }
@@ -108,7 +170,7 @@ namespace BNG
             irGlowColor = color;
             irIntensity = intensity;
             
-            if (particleMaterial != null)
+            if (particleMaterial != null && !useSimpleVisibility)
             {
                 particleMaterial.SetColor("_IRColor", color);
                 particleMaterial.SetFloat("_IRIntensity", intensity);
@@ -126,7 +188,7 @@ namespace BNG
         // Для дебага в редакторе
         void OnValidate()
         {
-            if (Application.isPlaying && particleMaterial != null)
+            if (Application.isPlaying && particleMaterial != null && !useSimpleVisibility)
             {
                 particleMaterial.SetColor("_IRColor", irGlowColor);
                 particleMaterial.SetFloat("_IRIntensity", irIntensity);

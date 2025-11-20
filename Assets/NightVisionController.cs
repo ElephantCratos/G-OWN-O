@@ -85,6 +85,9 @@ public class NightVisionController : MonoBehaviour
         // Сохраняем оригинальные настройки
         originalAmbientIntensity = RenderSettings.ambientIntensity;
         
+        // Устанавливаем начальное состояние для ИК-частиц
+        Shader.SetGlobalFloat(IRModeActive, 0f);
+        
         // Создаем материал если не задан
         if (nightVisionMaterial == null)
         {
@@ -201,6 +204,12 @@ public class NightVisionController : MonoBehaviour
         
         // Усиливаем освещение
         RenderSettings.ambientIntensity = Mathf.Max(originalAmbientIntensity, 1.2f);
+        
+        // АКТИВИРУЕМ ВИДИМОСТЬ ИК-ЧАСТИЦ
+        Shader.SetGlobalFloat(IRModeActive, 1f);
+        
+        // Обновляем все ИК-частицы в сцене
+        UpdateIRParticlesVisibility(true);
     }
 
     private void DisableNightVision()
@@ -215,6 +224,32 @@ public class NightVisionController : MonoBehaviour
         
         // Восстанавливаем освещение
         RenderSettings.ambientIntensity = originalAmbientIntensity;
+        
+        // ДЕАКТИВИРУЕМ ВИДИМОСТЬ ИК-ЧАСТИЦ
+        Shader.SetGlobalFloat(IRModeActive, 0f);
+        
+        // Обновляем все ИК-частицы в сцене
+        UpdateIRParticlesVisibility(false);
+    }
+    
+    // Обновляет видимость всех ИК-частиц в сцене
+    private void UpdateIRParticlesVisibility(bool visible)
+    {
+        Debug.Log($"[NightVision] UpdateIRParticlesVisibility({visible}) called");
+        
+        IRVisibleParticles[] allIRParticles = FindObjectsOfType<IRVisibleParticles>();
+        Debug.Log($"[NightVision] Found {allIRParticles.Length} IRVisibleParticles in scene");
+        
+        foreach (var irParticle in allIRParticles)
+        {
+            Debug.Log($"[NightVision] Updating {irParticle.gameObject.name}");
+            irParticle.SetVisibility(visible);
+        }
+        
+        if (allIRParticles.Length == 0)
+        {
+            Debug.LogWarning("[NightVision] No IRVisibleParticles found in scene! Make sure IRVisibleParticles component is attached to your particle systems.");
+        }
     }
 
     private void CreateDefaultNightVisionMaterial()
@@ -236,6 +271,9 @@ public class NightVisionController : MonoBehaviour
     {
         // Восстанавливаем настройки
         RenderSettings.ambientIntensity = originalAmbientIntensity;
+        
+        // Деактивируем ИК-режим
+        Shader.SetGlobalFloat(IRModeActive, 0f);
         
         // Убираем эффект с камеры
         if (playerCamera != null)
