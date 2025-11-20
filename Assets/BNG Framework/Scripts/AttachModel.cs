@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace BNG
 {
@@ -18,6 +19,9 @@ namespace BNG
         public float SnapSpeed = 10f;
         [Tooltip("Расстояние, при котором объект прикрепляется")]
         public float SnapDistance = 0.15f;
+
+        [Header("События")]
+        public UnityEvent<float> OnAverageWearChanged = new UnityEvent<float>();
 
         // Словарь для отслеживания занятости каждого сокета
         private Dictionary<Transform, GameObject> occupiedSockets = new Dictionary<Transform, GameObject>();
@@ -48,6 +52,9 @@ namespace BNG
                         rb.isKinematic = true;
 
                     Debug.Log($"{name}: {obj.name} вставлен в {nearestPoint.name}");
+                    
+                    // Обновляем средний износ
+                    UpdateAverageWear();
                 }
             }
 
@@ -86,6 +93,9 @@ namespace BNG
                     rb.isKinematic = false;
 
                 Debug.Log($"{name}: {obj.name} удалён из сокета {socketToFree.name}");
+                
+                // Обновляем средний износ
+                UpdateAverageWear();
             }
         }
 
@@ -142,6 +152,65 @@ namespace BNG
             }
 
             return nearest;
+        }
+
+        /// <summary>
+        /// Вычисляет средний уровень износа всех вставленных пинов
+        /// </summary>
+        public float GetAverageWear()
+        {
+            if (occupiedSockets.Count == 0)
+                return 0f;
+
+            float totalWear = 0f;
+            int pinsWithWear = 0;
+
+            foreach (var kvp in occupiedSockets)
+            {
+                GameObject pin = kvp.Value;
+                if (pin != null)
+                {
+                    PinWear pinWear = pin.GetComponent<PinWear>();
+                    if (pinWear != null)
+                    {
+                        totalWear += pinWear.WearLevel;
+                        pinsWithWear++;
+                    }
+                }
+            }
+
+            return pinsWithWear > 0 ? totalWear / pinsWithWear : 0f;
+        }
+
+        /// <summary>
+        /// Обновляет средний износ и вызывает событие
+        /// </summary>
+        void UpdateAverageWear()
+        {
+            float avgWear = GetAverageWear();
+            OnAverageWearChanged?.Invoke(avgWear);
+        }
+
+        /// <summary>
+        /// Возвращает список всех вставленных пинов
+        /// </summary>
+        public List<GameObject> GetInsertedPins()
+        {
+            List<GameObject> pins = new List<GameObject>();
+            foreach (var kvp in occupiedSockets)
+            {
+                if (kvp.Value != null)
+                    pins.Add(kvp.Value);
+            }
+            return pins;
+        }
+
+        /// <summary>
+        /// Возвращает количество вставленных пинов
+        /// </summary>
+        public int GetInsertedPinsCount()
+        {
+            return occupiedSockets.Count;
         }
     }
 }
