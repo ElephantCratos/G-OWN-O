@@ -63,7 +63,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _Intensity: 1.2
+    - _Intensity: 2
     - _Metallic: 0
     - _Mode: 0
     - _Noise: 0.1

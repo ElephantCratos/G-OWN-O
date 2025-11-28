@@ -115,7 +115,7 @@ Shader "Hidden/NightVision"
                 float time = _Time.y;
                 
                 // Применяем небольшое искажение
-                float2 distortedUV = distortion(i.uv, time);
+                float2 distortedUV = i.uv;
                 
                 // Получаем исходный цвет
                 fixed4 col = tex2D(_MainTex, distortedUV);
