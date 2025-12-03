@@ -11,12 +11,17 @@ public class DayEventManager : MonoBehaviour
     {
         public string eventName;
         public bool isCompleted = false;
+        public UnityEvent onEventStart;
         public UnityEvent onEventComplete;
     }
     
     [Header("Day Management")]
     public int currentDay = 1;
     public List<DayEvent> todayEvents = new List<DayEvent>();
+    
+    [Header("Event Spawners")]
+    public RatSpawner ratSpawner;
+    public HoleSpawner holeSpawner; // Добавили spawner пробоин
     
     [Header("Events")]
     public UnityEvent OnDayComplete;
@@ -60,24 +65,87 @@ public class DayEventManager : MonoBehaviour
     {
         currentDay++;
         
-        // Сбрасываем все ивенты
-        foreach (var dayEvent in todayEvents)
-        {
-            dayEvent.isCompleted = false;
-        }
+        // Очищаем старые ивенты
+        todayEvents.Clear();
         
         OnNewDayStarted?.Invoke(currentDay);
         
         Debug.Log($"Начался день {currentDay}");
         
-        // Здесь можно генерировать новые ивенты для нового дня
+        // Генерируем новые ивенты для нового дня
         GenerateDayEvents();
+        
+        // Запускаем все ивенты
+        StartAllEvents();
     }
     
     private void GenerateDayEvents()
     {
-        // Логика генерации новых ивентов для дня
-        // Можно добавлять случайные задачи, менять их количество и т.д.
+        // Пример генерации случайных ивентов
+        
+        // 50% шанс ивента с крысами
+        if (Random.value > 0.5f && ratSpawner != null)
+        {
+            DayEvent ratEvent = new DayEvent
+            {
+                eventName = "ClearRats",
+                isCompleted = false
+            };
+            todayEvents.Add(ratEvent);
+        }
+        
+        // 50% шанс ивента с пробоинами
+        if (Random.value > 0.5f && holeSpawner != null)
+        {
+            DayEvent holeEvent = new DayEvent
+            {
+                eventName = "PatchHoles",
+                isCompleted = false
+            };
+            todayEvents.Add(holeEvent);
+        }
+        
+        // Если не выпало ни одного ивента, добавим хотя бы один
+        if (todayEvents.Count == 0 && ratSpawner != null)
+        {
+            DayEvent ratEvent = new DayEvent
+            {
+                eventName = "ClearRats",
+                isCompleted = false
+            };
+            todayEvents.Add(ratEvent);
+        }
+        
+        Debug.Log($"Сгенерировано ивентов: {todayEvents.Count}");
+    }
+    
+    private void StartAllEvents()
+    {
+        foreach (var dayEvent in todayEvents)
+        {
+            // Запускаем ивент в зависимости от его имени
+            switch (dayEvent.eventName)
+            {
+                case "ClearRats":
+                    if (ratSpawner != null)
+                    {
+                        ratSpawner.StartSpawning();
+                        Debug.Log("Запущен ивент: ClearRats");
+                    }
+                    break;
+                    
+                case "PatchHoles":
+                    if (holeSpawner != null)
+                    {
+                        holeSpawner.StartHoleEvent();
+                        Debug.Log("Запущен ивент: PatchHoles");
+                    }
+                    break;
+            }
+            
+            // Вызываем UnityEvent если он настроен в инспекторе
+            dayEvent.onEventStart?.Invoke();
+        }
     }
     
     // Метод для проверки состояния ивентов (для UI)
