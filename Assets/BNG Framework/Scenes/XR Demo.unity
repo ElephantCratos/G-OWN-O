@@ -196898,7 +196898,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5692a41fae5fcbc47a476562fccec612, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  WearLevel: 50
+  WearLevel: 0
   pinRenderer: {fileID: 0}
   newPinColor: {r: 0, g: 1, b: 0, a: 1}
   wornPinColor: {r: 1, g: 0, b: 0, a: 1}
@@ -246341,7 +246341,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5692a41fae5fcbc47a476562fccec612, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  WearLevel: 50
+  WearLevel: 0
   pinRenderer: {fileID: 0}
   newPinColor: {r: 0, g: 1, b: 0, a: 1}
   wornPinColor: {r: 1, g: 0, b: 0, a: 1}
@@ -253371,7 +253371,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5692a41fae5fcbc47a476562fccec612, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  WearLevel: 50
+  WearLevel: 0
   pinRenderer: {fileID: 0}
   newPinColor: {r: 0, g: 1, b: 0, a: 1}
   wornPinColor: {r: 1, g: 0, b: 0, a: 1}
@@ -264256,7 +264256,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5692a41fae5fcbc47a476562fccec612, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  WearLevel: 50
+  WearLevel: 0
   pinRenderer: {fileID: 0}
   newPinColor: {r: 0, g: 1, b: 0, a: 1}
   wornPinColor: {r: 1, g: 0, b: 0, a: 1}
