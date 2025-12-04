@@ -22,6 +22,7 @@ public class DayEventManager : MonoBehaviour
     [Header("Event Spawners")]
     public RatSpawner ratSpawner;
     public HoleSpawner holeSpawner; // Добавили spawner пробоин
+    public ControlPanelMalfunction controlPanelMalfunction;
     
     [Header("Events")]
     public UnityEvent OnDayComplete;
@@ -79,10 +80,8 @@ public class DayEventManager : MonoBehaviour
         StartAllEvents();
     }
     
-    private void GenerateDayEvents()
+     private void GenerateDayEvents()
     {
-        // Пример генерации случайных ивентов
-        
         // 50% шанс ивента с крысами
         if (Random.value > 0.5f && ratSpawner != null)
         {
@@ -105,15 +104,35 @@ public class DayEventManager : MonoBehaviour
             todayEvents.Add(holeEvent);
         }
         
-        // Если не выпало ни одного ивента, добавим хотя бы один
-        if (todayEvents.Count == 0 && ratSpawner != null)
+        // === ДОБАВЛЕНО: 40% шанс ивента с поломкой панели управления ===
+        if (Random.value > 0.6f && controlPanelMalfunction != null)
         {
-            DayEvent ratEvent = new DayEvent
+            DayEvent controlEvent = new DayEvent
             {
-                eventName = "ClearRats",
+                eventName = "FixControls",
                 isCompleted = false
             };
-            todayEvents.Add(ratEvent);
+            todayEvents.Add(controlEvent);
+        }
+        
+        // Если не выпало ни одного ивента, добавим хотя бы один
+        if (todayEvents.Count == 0)
+        {
+            // Случайно выбираем какой ивент добавить
+            int randomEvent = Random.Range(0, 3);
+            
+            if (randomEvent == 0 && ratSpawner != null)
+            {
+                todayEvents.Add(new DayEvent { eventName = "ClearRats" });
+            }
+            else if (randomEvent == 1 && holeSpawner != null)
+            {
+                todayEvents.Add(new DayEvent { eventName = "PatchHoles" });
+            }
+            else if (controlPanelMalfunction != null)
+            {
+                todayEvents.Add(new DayEvent { eventName = "FixControls" });
+            }
         }
         
         Debug.Log($"Сгенерировано ивентов: {todayEvents.Count}");
@@ -123,7 +142,6 @@ public class DayEventManager : MonoBehaviour
     {
         foreach (var dayEvent in todayEvents)
         {
-            // Запускаем ивент в зависимости от его имени
             switch (dayEvent.eventName)
             {
                 case "ClearRats":
@@ -141,9 +159,17 @@ public class DayEventManager : MonoBehaviour
                         Debug.Log("Запущен ивент: PatchHoles");
                     }
                     break;
+                
+                // === ДОБАВЛЕНО ===
+                case "FixControls":
+                    if (controlPanelMalfunction != null)
+                    {
+                        controlPanelMalfunction.StartMalfunction();
+                        Debug.Log("Запущен ивент: FixControls - Авария систем!");
+                    }
+                    break;
             }
             
-            // Вызываем UnityEvent если он настроен в инспекторе
             dayEvent.onEventStart?.Invoke();
         }
     }
