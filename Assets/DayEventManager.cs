@@ -25,6 +25,8 @@ public class DayEventManager : MonoBehaviour
     public ControlPanelMalfunction controlPanelMalfunction;
 
     public BatteryReplacementEvent batteryReplacementEvent;
+
+    public PinReplacementTask pinReplacementTask;
     
     [Header("Events")]
     public UnityEvent OnDayComplete;
@@ -122,6 +124,16 @@ public class DayEventManager : MonoBehaviour
             };
             todayEvents.Add(controlEvent);
         }
+
+        if (Random.value > 0.6f && pinReplacementTask != null)
+        {
+            DayEvent pinEvent = new DayEvent
+            {
+                eventName = "ReplacePins",
+                isCompleted = false
+            };
+            todayEvents.Add(pinEvent);
+        }
         
         // Если не выпало ни одного ивента, добавим хотя бы один
         if (todayEvents.Count == 0)
@@ -140,6 +152,10 @@ public class DayEventManager : MonoBehaviour
             else if (controlPanelMalfunction != null)
             {
                 todayEvents.Add(new DayEvent { eventName = "FixControls" });
+            }
+            else if (pinReplacementTask != null)
+            {
+                todayEvents.Add(new DayEvent { eventName = "ReplacePins" });
             }
         }
         
@@ -174,6 +190,13 @@ public class DayEventManager : MonoBehaviour
                     {
                         controlPanelMalfunction.StartMalfunction();
                         Debug.Log("Запущен ивент: FixControls - Авария систем!");
+                    }
+                    break;
+                case "ReplacePins":
+                    if (pinReplacementTask != null)
+                    {
+                        pinReplacementTask.StartReplacementTask();
+                        Debug.Log("Запущен ивент: ReplacePins - Замена изношенных пинов!");
                     }
                     break;
             }
@@ -240,4 +263,15 @@ public void RemoveEvent(string eventName)
     todayEvents.RemoveAll(e => e.eventName == eventName);
     Debug.Log($"Ивент '{eventName}' удалён");
 }
+public bool IsPinReplacementActive()
+    {
+        foreach (var dayEvent in todayEvents)
+        {
+            if (dayEvent.eventName == "ReplacePins")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }

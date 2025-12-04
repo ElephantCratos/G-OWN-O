@@ -20,6 +20,10 @@ namespace BNG
         [Tooltip("Расстояние, при котором объект прикрепляется")]
         public float SnapDistance = 0.15f;
 
+        [Header("Блокировка пинов")]
+        [Tooltip("Если true, пины нельзя извлечь из сокетов")]
+        public bool ArePinsLocked = true;
+
         [Header("События")]
         public UnityEvent<float> OnAverageWearChanged = new UnityEvent<float>();
 
@@ -50,6 +54,9 @@ namespace BNG
                     Rigidbody rb = obj.GetComponent<Rigidbody>();
                     if (rb != null)
                         rb.isKinematic = true;
+
+                    // Блокируем Grabbable если пины заблокированы
+                    UpdatePinLockState(obj);
 
                     Debug.Log($"{name}: {obj.name} вставлен в {nearestPoint.name}");
                     
@@ -85,6 +92,17 @@ namespace BNG
             Transform socketToFree = GetSocketForObject(obj);
 
             if (socketToFree != null) {
+                // Проверяем, разрешено ли извлечение
+                if (ArePinsLocked)
+                {
+                    // Пины заблокированы - не даём извлечь
+                    Debug.Log($"{name}: Попытка извлечь {obj.name}, но пины заблокированы!");
+                    
+                    // Возвращаем пин обратно в сокет
+                    StartCoroutine(ReturnPinToSocket(obj, socketToFree));
+                    return;
+                }
+
                 // Освобождаем сокет
                 occupiedSockets.Remove(socketToFree);
 
@@ -92,10 +110,93 @@ namespace BNG
                 if (rb != null)
                     rb.isKinematic = false;
 
+                // Разблокируем Grabbable при извлечении
+                Grabbable grabbable = obj.GetComponent<Grabbable>();
+                if (grabbable != null)
+                {
+                    grabbable.enabled = true;
+                }
+
                 Debug.Log($"{name}: {obj.name} удалён из сокета {socketToFree.name}");
                 
                 // Обновляем средний износ
                 UpdateAverageWear();
+            }
+        }
+
+        /// <summary>
+        /// Корутина для возврата пина в сокет при попытке извлечения
+        /// </summary>
+        IEnumerator ReturnPinToSocket(GameObject pin, Transform socket)
+        {
+            // Ждём один кадр
+            yield return null;
+
+            // Сбрасываем захват
+            Grabbable grabbable = pin.GetComponent<Grabbable>();
+            if (grabbable != null && grabbable.BeingHeld)
+            {
+                grabbable.DropItem(false, false);
+            }
+
+            // Возвращаем в позицию сокета
+            pin.transform.position = socket.position;
+            pin.transform.rotation = socket.rotation;
+
+            // Обеспечиваем кинематику
+            Rigidbody rb = pin.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
+
+        /// <summary>
+        /// Устанавливает блокировку извлечения пинов
+        /// </summary>
+        public void SetPinsLocked(bool locked)
+        {
+            ArePinsLocked = locked;
+
+            // Обновляем состояние всех вставленных пинов
+            foreach (var kvp in occupiedSockets)
+            {
+                if (kvp.Value != null)
+                {
+                    UpdatePinLockState(kvp.Value);
+                }
+            }
+
+            Debug.Log($"{name}: Пины {(locked ? "ЗАБЛОКИРОВАНЫ" : "РАЗБЛОКИРОВАНЫ")}");
+        }
+
+        /// <summary>
+        /// Обновляет состояние блокировки конкретного пина
+        /// </summary>
+        void UpdatePinLockState(GameObject pin)
+        {
+            Grabbable grabbable = pin.GetComponent<Grabbable>();
+            if (grabbable != null)
+            {
+                // Если пины заблокированы - отключаем возможность хватать
+                if (ArePinsLocked)
+                {
+                    // Если пин захвачен - отпускаем его
+                    if (grabbable.BeingHeld)
+                    {
+                        grabbable.DropItem(false, false);
+                    }
+                    
+                    // Отключаем компонент Grabbable
+                    grabbable.enabled = false;
+                }
+                else
+                {
+                    // Включаем возможность хватать
+                    grabbable.enabled = true;
+                }
             }
         }
 
