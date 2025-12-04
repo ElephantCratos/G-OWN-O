@@ -158,6 +158,7 @@ namespace BNG
                     Debug.Log($"PinReplacementTask: Пин {pin.name} получил износ {wear:F1}%");
                 }
             }
+            attachModel.ForceUpdateAverageWear();
         }
 
         /// <summary>

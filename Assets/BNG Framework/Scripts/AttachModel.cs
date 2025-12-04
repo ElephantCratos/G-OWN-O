@@ -313,5 +313,10 @@ namespace BNG
         {
             return occupiedSockets.Count;
         }
+
+        public void ForceUpdateAverageWear()
+        {
+            UpdateAverageWear();
+        }
     }
 }
