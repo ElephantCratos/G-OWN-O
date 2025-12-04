@@ -23,6 +23,8 @@ public class DayEventManager : MonoBehaviour
     public RatSpawner ratSpawner;
     public HoleSpawner holeSpawner; // Добавили spawner пробоин
     public ControlPanelMalfunction controlPanelMalfunction;
+
+    public BatteryReplacementEvent batteryReplacementEvent;
     
     [Header("Events")]
     public UnityEvent OnDayComplete;
@@ -64,10 +66,12 @@ public class DayEventManager : MonoBehaviour
     
     public void StartNewDay()
     {
-         if (controlPanelMalfunction != null)
-    {
+        if (controlPanelMalfunction != null)
         controlPanelMalfunction.EndMalfunctionEvent();
-    }
+    
+        if (batteryReplacementEvent != null)
+        batteryReplacementEvent.ResetEvent();
+    
         currentDay++;
         
         // Очищаем старые ивенты
@@ -202,5 +206,38 @@ public class DayEventManager : MonoBehaviour
             break;
         }
     }
+}
+public void AddEvent(string eventName)
+{
+    // === ДЕБАГ: кто вызывает? ===
+    Debug.Log($"[DayEventManager] AddEvent('{eventName}') вызван из:\n{System.Environment.StackTrace}");
+    
+    foreach (var existing in todayEvents)
+    {
+        if (existing.eventName == eventName)
+        {
+            Debug.Log($"Ивент '{eventName}' уже существует");
+            return;
+        }
+    }
+    
+    DayEvent newEvent = new DayEvent
+    {
+        eventName = eventName,
+        isCompleted = false
+    };
+    
+    todayEvents.Add(newEvent);
+    
+    Debug.Log($"Добавлен динамический ивент: {eventName}");
+}
+
+/// <summary>
+/// Удаляет ивент из списка (если нужно полностью убрать)
+/// </summary>
+public void RemoveEvent(string eventName)
+{
+    todayEvents.RemoveAll(e => e.eventName == eventName);
+    Debug.Log($"Ивент '{eventName}' удалён");
 }
 }

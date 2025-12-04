@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace BNG {
     public class BatterySocket : MonoBehaviour {
@@ -13,31 +14,55 @@ namespace BNG {
         [Header("Snap Settings")]
         public float SnapSpeed = 10f;
         public float SnapDistance = 0.15f;
+        
+        [Tooltip("Расстояние для выхода из слота (должно быть больше SnapDistance)")]
+        public float ExitDistance = 0.25f;
+
+        [Header("События")]
+        public UnityEvent<Battery> OnBatteryInserted;
+        public UnityEvent<Battery> OnBatteryRemoved;
 
         private Battery currentBattery;
+        
+        // === Защита от дребезга ===
+        private bool batteryFullySnapped = false;
+        
+        public Battery CurrentBattery => currentBattery;
+        public bool HasBattery => currentBattery != null;
 
         void OnTriggerStay(Collider other) {
             Battery battery = other.GetComponent<Battery>();
             if (battery == null) return;
 
-            // Если батарея близко — считаем, что она "в слоте"
-            if (currentBattery == null && Vector3.Distance(other.transform.position, InsertPoint.position) < SnapDistance) {
+            float distance = Vector3.Distance(other.transform.position, InsertPoint.position);
+
+            // Батарея входит в слот
+            if (currentBattery == null && distance < SnapDistance) {
                 currentBattery = battery;
                 battery.IsInSocket = true;
-                Debug.Log($"{name}: Battery snapped in!");
+                batteryFullySnapped = false; // Ещё не зафиксирована
+                
+                Debug.Log($"{name}: Battery entering socket...");
             }
 
-            // Если батарея уже вставлена и не удерживается рукой — фиксируем позицию
+            // Батарея в слоте и не удерживается — фиксируем
             if (battery == currentBattery && !battery.BeingHeld) {
-                // Отключаем физику, чтобы не дрожала
                 Rigidbody rb = battery.GetComponent<Rigidbody>();
                 if (rb != null) {
                     rb.isKinematic = true;
                 }
 
-                // Плавно притягиваем к InsertPoint
+                // Притягиваем к точке
                 battery.transform.position = Vector3.Lerp(battery.transform.position, InsertPoint.position, Time.deltaTime * SnapSpeed);
                 battery.transform.rotation = Quaternion.Lerp(battery.transform.rotation, InsertPoint.rotation, Time.deltaTime * SnapSpeed);
+
+                // Проверяем — батарейка полностью зафиксировалась?
+                float snapDist = Vector3.Distance(battery.transform.position, InsertPoint.position);
+                if (!batteryFullySnapped && snapDist < 0.01f) {
+                    batteryFullySnapped = true;
+                    OnBatteryInserted?.Invoke(battery);
+                    Debug.Log($"{name}: Battery fully snapped!");
+                }
 
                 // Заряд / разряд
                 if (IsCharger)
@@ -46,27 +71,43 @@ namespace BNG {
                     battery.Discharge(PowerRate);
             }
 
-            // Если батарею держат — снова разрешаем физику
+            // Батарею взяли рукой — извлекаем
             if (battery.BeingHeld && battery == currentBattery) {
-                Rigidbody rb = battery.GetComponent<Rigidbody>();
-                if (rb != null) rb.isKinematic = false;
-
-                battery.IsInSocket = false;
-                currentBattery = null;
-                Debug.Log($"{name}: Battery manually removed.");
+                RemoveBattery(battery);
             }
         }
 
         void OnTriggerExit(Collider other) {
             Battery battery = other.GetComponent<Battery>();
-            if (battery != null && battery == currentBattery) {
-                Rigidbody rb = battery.GetComponent<Rigidbody>();
-                if (rb != null) rb.isKinematic = false;
-
-                battery.IsInSocket = false;
-                currentBattery = null;
-                Debug.Log($"{name}: Battery exited socket.");
+            if (battery == null || battery != currentBattery) return;
+            
+            // Проверяем реальное расстояние — защита от дребезга
+            float distance = Vector3.Distance(other.transform.position, InsertPoint.position);
+            
+            // Выходим только если действительно далеко
+            if (distance > ExitDistance) {
+                RemoveBattery(battery);
             }
+        }
+        
+        private void RemoveBattery(Battery battery) {
+            if (battery == null || battery != currentBattery) return;
+            
+            Rigidbody rb = battery.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+
+            battery.IsInSocket = false;
+            
+            Battery removedBattery = currentBattery;
+            currentBattery = null;
+            
+            // Вызываем событие только если батарейка была полностью вставлена
+            if (batteryFullySnapped) {
+                OnBatteryRemoved?.Invoke(removedBattery);
+                Debug.Log($"{name}: Battery removed.");
+            }
+            
+            batteryFullySnapped = false;
         }
     }
 }
