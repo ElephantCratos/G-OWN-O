@@ -176,6 +176,24 @@ namespace BNG {
             // Align lever with Grabber
             doLeverLook();
         }
+        // Добавь этот метод в класс Lever
+
+/// <summary>
+/// Устанавливает позицию рычага по проценту (0-100)
+/// </summary>
+public void SetLeverPercentage(float percentage)
+{
+    percentage = Mathf.Clamp(percentage, 0f, 100f);
+    
+    // Конвертируем процент в угол
+    float angle = MinimumXRotation + (percentage / 100f) * (MaximumXRotation - MinimumXRotation);
+    
+    SetLeverAngle(angle);
+    
+    // Принудительно обновляем процент и вызываем событие
+    LeverPercentage = percentage;
+    OnLeverChange(percentage);
+}
 
         Quaternion initialOffset = Quaternion.identity;
 

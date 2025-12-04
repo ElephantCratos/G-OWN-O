@@ -2,9 +2,6 @@ using UnityEngine;
 using UnityEngine.Events;
 
 namespace BNG {
-    /// <summary>
-    /// Управляет ивентом "поломки" панели управления кораблём
-    /// </summary>
     public class ControlPanelMalfunction : MonoBehaviour
     {
         [Header("Ссылки")]
@@ -12,83 +9,92 @@ namespace BNG {
         public DayEventManager dayEventManager;
         
         [Header("Настройки поломки")]
-        [Tooltip("Минимальное отклонение от текущих значений при поломке")]
         public float minDeviation = 30f;
-        
-        [Tooltip("Максимальное отклонение от текущих значений при поломке")]
         public float maxDeviation = 90f;
-        
-        [Tooltip("Минимальная целевая скорость при поломке")]
         public float minSpeedTarget = 20f;
-        
-        [Tooltip("Максимальная целевая скорость при поломке")]
         public float maxSpeedTarget = 90f;
         
-        [Header("Аварийные эффекты (опционально)")]
+        [Header("Аварийные эффекты")]
         public GameObject alarmLights;
         public AudioSource alarmSound;
         
         [Header("События")]
         public UnityEvent OnMalfunctionStart;
         public UnityEvent OnMalfunctionFixed;
-        
-        // Сохранённые "нормальные" значения
-        private float normalVertical;
-        private float normalHorizontal;
-        private float normalSpeed;
+        public UnityEvent OnMalfunctionRelapsed;
         
         private bool isMalfunctionActive = false;
-        
-        private void Start()
-        {
-            // Сохраняем начальные "нормальные" значения
-            if (controlPanel != null)
-            {
-                normalVertical = controlPanel.targetVerticalAngle;
-                normalHorizontal = controlPanel.targetHorizontalAngle;
-                normalSpeed = controlPanel.targetSpeedPercent;
-            }
-        }
+        private bool isCurrentlyFixed = false;
         
         private void Update()
         {
-            // Проверяем, исправил ли игрок поломку
-            if (isMalfunctionActive && controlPanel != null)
+            if (!isMalfunctionActive || controlPanel == null) return;
+            
+            bool allCorrect = controlPanel.AreAllParametersCorrect();
+            
+            if (allCorrect && !isCurrentlyFixed)
             {
-                if (controlPanel.AreAllParametersCorrect())
-                {
-                    FixMalfunction();
-                }
+                OnParametersFixed();
+            }
+            else if (!allCorrect && isCurrentlyFixed)
+            {
+                OnParametersRelapsed();
             }
         }
         
-        /// <summary>
-        /// Запускает ивент поломки — вызывается из DayEventManager
-        /// </summary>
+        private void OnParametersFixed()
+        {
+            isCurrentlyFixed = true;
+            
+            if (alarmLights != null) alarmLights.SetActive(false);
+            if (alarmSound != null) alarmSound.Stop();
+            
+            if (dayEventManager != null)
+            {
+                dayEventManager.CompleteEvent("FixControls");
+            }
+            
+            OnMalfunctionFixed?.Invoke();
+            
+            Debug.Log("Системы стабилизированы! Держите параметры до конца дня.");
+        }
+        
+        private void OnParametersRelapsed()
+        {
+            isCurrentlyFixed = false;
+            
+            if (alarmLights != null) alarmLights.SetActive(true);
+            if (alarmSound != null) alarmSound.Play();
+            
+            if (dayEventManager != null)
+            {
+                dayEventManager.UncompleteEvent("FixControls");
+            }
+            
+            OnMalfunctionRelapsed?.Invoke();
+            
+            Debug.Log("ВНИМАНИЕ! Параметры снова вышли из нормы!");
+        }
+        
         public void StartMalfunction()
         {
             if (controlPanel == null || isMalfunctionActive) return;
             
             isMalfunctionActive = true;
+            isCurrentlyFixed = false;
             
-            // Генерируем новые "аварийные" целевые значения
-            float newVertical = GenerateDeviatedAngle(normalVertical);
-            float newHorizontal = GenerateDeviatedAngle(normalHorizontal);
-            float newSpeed = Random.Range(minSpeedTarget, maxSpeedTarget);
+            // Разблокируем контролы
+            controlPanel.UnlockControls();
             
-            // Убеждаемся, что скорость достаточно отличается от текущей
-            if (Mathf.Abs(newSpeed - normalSpeed) < minDeviation)
-            {
-                newSpeed = normalSpeed + (Random.value > 0.5f ? minDeviation : -minDeviation);
-                newSpeed = Mathf.Clamp(newSpeed, 0f, 100f);
-            }
+            // Генерируем аварийные целевые значения
+            float newVertical = GenerateDeviatedAngle(controlPanel.targetVerticalAngle);
+            float newHorizontal = GenerateDeviatedAngle(controlPanel.targetHorizontalAngle);
+            float newSpeed = GenerateDeviatedSpeed(controlPanel.targetSpeedPercent);
             
-            // Устанавливаем новые целевые значения
             controlPanel.SetTargetVertical(newVertical);
             controlPanel.SetTargetHorizontal(newHorizontal);
             controlPanel.SetTargetSpeed(newSpeed);
             
-            // Включаем эффекты тревоги
             if (alarmLights != null) alarmLights.SetActive(true);
             if (alarmSound != null) alarmSound.Play();
             
@@ -97,66 +103,59 @@ namespace BNG {
             Debug.Log($"АВАРИЯ! Новые целевые параметры: V={newVertical:F0}°, H={newHorizontal:F0}°, S={newSpeed:F0}%");
         }
         
-        /// <summary>
-        /// Вызывается когда игрок исправил все параметры
-        /// </summary>
-        private void FixMalfunction()
+        public void EndMalfunctionEvent()
         {
-            isMalfunctionActive = false;
+            if (!isMalfunctionActive) return;
             
-            // Выключаем эффекты тревоги
+            isMalfunctionActive = false;
+            isCurrentlyFixed = false;
+            
+            // Выставляем контролы в целевые позиции и блокируем
+            controlPanel.SetControlsToTargetPositions();
+            controlPanel.LockControls();
+            
             if (alarmLights != null) alarmLights.SetActive(false);
             if (alarmSound != null) alarmSound.Stop();
-            
-            // Возвращаем нормальные целевые значения
-            controlPanel.SetTargetVertical(normalVertical);
-            controlPanel.SetTargetHorizontal(normalHorizontal);
-            controlPanel.SetTargetSpeed(normalSpeed);
-            
-            OnMalfunctionFixed?.Invoke();
-            
-            // Сообщаем DayEventManager что ивент завершён
-            if (dayEventManager != null)
-            {
-                dayEventManager.CompleteEvent("FixControls");
-            }
-            
-            Debug.Log("Системы корабля стабилизированы!");
+
+            Debug.Log("Ивент поломки завершён");
         }
         
-        /// <summary>
-        /// Генерирует угол, отклонённый от исходного
-        /// </summary>
+        public void ForceStopMalfunction()
+        {
+            if (!isMalfunctionActive) return;
+            
+            isMalfunctionActive = false;
+            isCurrentlyFixed = false;
+            
+            controlPanel.SetControlsToTargetPositions();
+            controlPanel.LockControls();
+            
+            if (alarmLights != null) alarmLights.SetActive(false);
+            if (alarmSound != null) alarmSound.Stop();
+        }
+        
         private float GenerateDeviatedAngle(float originalAngle)
         {
             float deviation = Random.Range(minDeviation, maxDeviation);
             float direction = Random.value > 0.5f ? 1f : -1f;
             float newAngle = originalAngle + (deviation * direction);
             
-            // Нормализуем угол в диапазон 0-360
             newAngle %= 360f;
             if (newAngle < 0) newAngle += 360f;
             
             return newAngle;
         }
         
-        /// <summary>
-        /// Принудительная остановка ивента (если нужно)
-        /// </summary>
-        public void ForceStopMalfunction()
+        private float GenerateDeviatedSpeed(float originalSpeed)
         {
-            if (!isMalfunctionActive) return;
+            float deviation = Random.Range(minDeviation, maxDeviation);
+            float direction = Random.value > 0.5f ? 1f : -1f;
+            float newSpeed = originalSpeed + (deviation * direction);
             
-            isMalfunctionActive = false;
-            
-            if (alarmLights != null) alarmLights.SetActive(false);
-            if (alarmSound != null) alarmSound.Stop();
-            
-            controlPanel.SetTargetVertical(normalVertical);
-            controlPanel.SetTargetHorizontal(normalHorizontal);
-            controlPanel.SetTargetSpeed(normalSpeed);
+            return Mathf.Clamp(newSpeed, minSpeedTarget, maxSpeedTarget);
         }
         
         public bool IsMalfunctionActive() => isMalfunctionActive;
+        public bool IsCurrentlyFixed() => isCurrentlyFixed;
     }
 }

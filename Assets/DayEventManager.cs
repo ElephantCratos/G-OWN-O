@@ -64,6 +64,10 @@ public class DayEventManager : MonoBehaviour
     
     public void StartNewDay()
     {
+         if (controlPanelMalfunction != null)
+    {
+        controlPanelMalfunction.EndMalfunctionEvent();
+    }
         currentDay++;
         
         // Очищаем старые ивенты
@@ -185,4 +189,18 @@ public class DayEventManager : MonoBehaviour
         
         return $"День {currentDay}: {completed}/{todayEvents.Count} задач выполнено";
     }
+
+    public void UncompleteEvent(string eventName)
+{
+    foreach (var dayEvent in todayEvents)
+    {
+        if (dayEvent.eventName == eventName && dayEvent.isCompleted)
+        {
+            dayEvent.isCompleted = false;
+            
+            Debug.Log($"Ивент '{eventName}' снова активен — параметры сбились!");
+            break;
+        }
+    }
+}
 }

@@ -74,6 +74,25 @@ namespace BNG {
             }
         }
 
+        /// <summary>
+/// Устанавливает угол крутилки напрямую
+/// </summary>
+public void SetHingeAngle(float yAngle)
+{
+    transform.localEulerAngles = new Vector3(transform.localEulerAngles.x, yAngle, transform.localEulerAngles.z);
+    
+    // Принудительно вызываем событие
+    float smoothed = getSmoothedValue(yAngle);
+    OnHingeChange(smoothed);
+    _lastDegrees = smoothed;
+    
+    // Обновляем snap graphics если нужно
+    if (SnapToDegrees && SnapGraphics != null)
+    {
+        float nearestSnap = getSmoothedValue(Mathf.Round(smoothed / SnapDegrees) * SnapDegrees);
+        SnapGraphics.localEulerAngles = new Vector3(SnapGraphics.localEulerAngles.x, nearestSnap, SnapGraphics.localEulerAngles.z);
+    }
+}
         public void OnSnapChange(float yAngle) {
 
             if(SnapGraphics) {

@@ -139021,11 +139021,12 @@ MonoBehaviour:
   targetVerticalAngle: 90
   targetHorizontalAngle: 180
   targetSpeedPercent: 75
-  angleTolerance: 0.1
+  angleTolerance: 0.5
   speedTolerance: 1
   correctColor: {r: 0, g: 1, b: 0, a: 1}
   incorrectColor: {r: 1, g: 0, b: 0, a: 1}
   warningColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  controlsLocked: 1
 --- !u!1 &681988870
 GameObject:
   m_ObjectHideFlags: 0
@@ -151616,6 +151617,9 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   OnMalfunctionFixed:
+    m_PersistentCalls:
+      m_Calls: []
+  OnMalfunctionRelapsed:
     m_PersistentCalls:
       m_Calls: []
 --- !u!4 &768859447

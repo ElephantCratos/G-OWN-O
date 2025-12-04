@@ -3,69 +3,36 @@ using UnityEngine.UI;
 using TMPro;
 
 namespace BNG {
-    /// <summary>
-    /// Панель управления космическим кораблём, отображающая текущие и целевые параметры
-    /// </summary>
     public class SpaceshipControlPanel : MonoBehaviour {
 
         [Header("Ссылки на крутилки и рычаг")]
-        [Tooltip("Крутилка для вертикального направления (вверх-вниз)")]
         public HingeHelper verticalKnob;
-
-        [Tooltip("Крутилка для горизонтального направления (влево-вправо)")]
         public HingeHelper horizontalKnob;
-
-        [Tooltip("Рычаг для управления скоростью")]
         public Lever speedLever;
 
         [Header("UI элементы - Текущие значения")]
-        [Tooltip("Текст для отображения текущего вертикального угла")]
         public TextMeshProUGUI currentVerticalText;
-
-        [Tooltip("Текст для отображения текущего горизонтального угла")]
         public TextMeshProUGUI currentHorizontalText;
-
-        [Tooltip("Текст для отображения текущей скорости")]
         public TextMeshProUGUI currentSpeedText;
 
         [Header("UI элементы - Целевые значения")]
-        [Tooltip("Текст для отображения целевого вертикального угла")]
         public TextMeshProUGUI targetVerticalText;
-
-        [Tooltip("Текст для отображения целевого горизонтального угла")]
         public TextMeshProUGUI targetHorizontalText;
-
-        [Tooltip("Текст для отображения целевой скорости")]
         public TextMeshProUGUI targetSpeedText;
 
         [Header("UI элементы - Статус")]
-        [Tooltip("Индикатор статуса вертикального направления")]
         public Image verticalStatusImage;
-
-        [Tooltip("Индикатор статуса горизонтального направления")]
         public Image horizontalStatusImage;
-
-        [Tooltip("Индикатор статуса скорости")]
         public Image speedStatusImage;
-
-        [Tooltip("Общий индикатор готовности (все параметры в норме)")]
         public Image overallStatusImage;
 
         [Header("Целевые параметры")]
-        [Tooltip("Целевой вертикальный угол (градусы)")]
         public float targetVerticalAngle = 90f;
-
-        [Tooltip("Целевой горизонтальный угол (градусы)")]
         public float targetHorizontalAngle = 180f;
-
-        [Tooltip("Целевой процент скорости (0-100)")]
         public float targetSpeedPercent = 75f;
 
         [Header("Настройки допуска")]
-        [Tooltip("Допустимое отклонение для углов (градусы)")]
         public float angleTolerance = 10f;
-
-        [Tooltip("Допустимое отклонение для скорости (проценты)")]
         public float speedTolerance = 5f;
 
         [Header("Цвета")]
@@ -73,29 +40,58 @@ namespace BNG {
         public Color incorrectColor = Color.red;
         public Color warningColor = Color.yellow;
 
+        [Header("Блокировка управления")]
+        [Tooltip("Заблокированы ли контролы")]
+        public bool controlsLocked = true;
+
         // Текущие значения
         private float currentVertical;
         private float currentHorizontal;
         private float currentSpeed;
 
+        // Кэшированные ссылки на Grabbable
+        private Grabbable verticalGrabbable;
+        private Grabbable horizontalGrabbable;
+        private Grabbable speedGrabbable;
+        private Rigidbody verticalRb;
+        private Rigidbody horizontalRb;
+        private Rigidbody speedRb;
+        private Collider verticalCollider;
+        private Collider horizontalCollider;
+        private Lever speedCollider;
+
+        // Сохранённые исходные состояния
+        private bool verticalWasKinematic;
+        private bool horizontalWasKinematic;
+        private bool speedWasKinematic;
         private void Start() {
-            // Подписываемся на изменения крутилок и рычага
-            if (verticalKnob != null) {
-                verticalKnob.onHingeChange.AddListener(OnVerticalChanged);
-            }
+    // Кэшируем Grabbable компоненты
+    if (verticalKnob != null) {
+        verticalGrabbable = verticalKnob.GetComponent<Grabbable>();
+        verticalRb = verticalKnob.GetComponent<Rigidbody>();
+        verticalKnob.onHingeChange.AddListener(OnVerticalChanged);
+    }
 
-            if (horizontalKnob != null) {
-                horizontalKnob.onHingeChange.AddListener(OnHorizontalChanged);
-            }
+    if (horizontalKnob != null) {
+        horizontalGrabbable = horizontalKnob.GetComponent<Grabbable>();
+        horizontalRb = horizontalKnob.GetComponent<Rigidbody>();
+        horizontalKnob.onHingeChange.AddListener(OnHorizontalChanged);
+    }
 
-            if (speedLever != null) {
-                speedLever.onLeverChange.AddListener(OnSpeedChanged);
-            }
+    if (speedLever != null) {
+        speedGrabbable = speedLever.GetComponent<Grabbable>();
+        speedRb = speedLever.GetComponent<Rigidbody>();
+        speedLever.onLeverChange.AddListener(OnSpeedChanged);
+    }
+    if (speedLever != null) speedCollider = speedLever.GetComponent<Lever>();
+    // По умолчанию блокируем и выставляем в целевые позиции
+    SetControlsToTargetPositions();
+    LockControls();
+    
+    UpdateTargetDisplay();
+    UpdateDisplay();
+}
 
-            // Инициализация целевых значений
-            UpdateTargetDisplay();
-            UpdateDisplay();
-        }
 
         private void OnDestroy() {
             if (verticalKnob != null) {
@@ -127,7 +123,6 @@ namespace BNG {
         }
 
         private void UpdateDisplay() {
-            // Обновляем текущие значения
             if (currentVerticalText != null) {
                 currentVerticalText.text = $"Вертикаль: {currentVertical:F0}°";
             }
@@ -140,12 +135,10 @@ namespace BNG {
                 currentSpeedText.text = $"Скорость: {currentSpeed:F0}%";
             }
 
-            // Проверяем каждый параметр
             bool verticalCorrect = IsAngleInRange(currentVertical, targetVerticalAngle, angleTolerance);
             bool horizontalCorrect = IsAngleInRange(currentHorizontal, targetHorizontalAngle, angleTolerance);
             bool speedCorrect = IsSpeedInRange(currentSpeed, targetSpeedPercent, speedTolerance);
 
-            // Обновляем индикаторы статуса
             if (verticalStatusImage != null) {
                 verticalStatusImage.color = verticalCorrect ? correctColor : incorrectColor;
             }
@@ -158,7 +151,6 @@ namespace BNG {
                 speedStatusImage.color = speedCorrect ? correctColor : incorrectColor;
             }
 
-            // Общий статус
             if (overallStatusImage != null) {
                 if (verticalCorrect && horizontalCorrect && speedCorrect) {
                     overallStatusImage.color = correctColor;
@@ -200,15 +192,123 @@ namespace BNG {
             return angle;
         }
 
-        // Публичные методы для изменения целевых параметров во время игры
+        // ==================== БЛОКИРОВКА ====================
+
+        /// <summary>
+        /// Блокирует крутилки и рычаг — игрок не может их трогать
+        /// </summary>
+        /// <summary>
+/// Блокирует крутилки и рычаг — игрок не может их трогать
+/// </summary>
+public void LockControls()
+{
+    controlsLocked = true;
+    
+    // Отключаем Grabbable
+    if (verticalGrabbable != null) verticalGrabbable.enabled = false;
+    if (horizontalGrabbable != null) horizontalGrabbable.enabled = false;
+    if (speedGrabbable != null) speedGrabbable.enabled = false;
+    if (speedCollider != null) speedCollider.enabled = false;
+    
+    // Замораживаем Rigidbody — сохраняем исходное состояние
+    if (verticalRb != null)
+    {
+        verticalWasKinematic = verticalRb.isKinematic;
+        verticalRb.isKinematic = true;
+    }
+    
+    if (horizontalRb != null)
+    {
+        horizontalWasKinematic = horizontalRb.isKinematic;
+        horizontalRb.isKinematic = true;
+    }
+    
+    if (speedRb != null)
+    {
+        speedWasKinematic = speedRb.isKinematic;
+        speedRb.isKinematic = true;
+    }
+
+   
+    
+    Debug.Log("Контролы заблокированы");
+}
+
+/// <summary>
+/// Разблокирует крутилки и рычаг
+/// </summary>
+public void UnlockControls()
+{
+    controlsLocked = false;
+    
+    // Включаем Grabbable
+    if (verticalGrabbable != null) verticalGrabbable.enabled = true;
+    if (horizontalGrabbable != null) horizontalGrabbable.enabled = true;
+    if (speedGrabbable != null) speedGrabbable.enabled = true;
+    if (speedCollider != null) speedCollider.enabled = true;
+    
+    // Восстанавливаем исходное состояние Rigidbody
+    if (verticalRb != null)
+    {
+        verticalRb.isKinematic = verticalWasKinematic;
+    }
+    
+    if (horizontalRb != null)
+    {
+        horizontalRb.isKinematic = horizontalWasKinematic;
+    }
+    
+    if (speedRb != null)
+    {
+        speedRb.isKinematic = speedWasKinematic;
+    }
+
+    
+    
+    Debug.Log("Контролы разблокированы");
+}
+
+
+        /// <summary>
+        /// Физически выставляет крутилки и рычаг в целевые позиции
+        /// </summary>
+        public void SetControlsToTargetPositions()
+        {
+            if (verticalKnob != null)
+            {
+                verticalKnob.SetHingeAngle(targetVerticalAngle);
+            }
+            
+            if (horizontalKnob != null)
+            {
+                horizontalKnob.SetHingeAngle(targetHorizontalAngle);
+            }
+            
+            if (speedLever != null)
+            {
+                speedLever.SetLeverPercentage(targetSpeedPercent);
+            }
+            
+            // Синхронизируем внутренние значения
+            currentVertical = targetVerticalAngle;
+            currentHorizontal = targetHorizontalAngle;
+            currentSpeed = targetSpeedPercent;
+            
+            UpdateDisplay();
+            
+            Debug.Log($"Контролы выставлены: V={targetVerticalAngle}°, H={targetHorizontalAngle}°, S={targetSpeedPercent}%");
+        }
+
+        // ==================== ПУБЛИЧНЫЕ МЕТОДЫ ====================
+
         public void SetTargetVertical(float angle) {
-            targetVerticalAngle = angle;
+            targetVerticalAngle = NormalizeAngle(angle);
             UpdateTargetDisplay();
             UpdateDisplay();
         }
 
         public void SetTargetHorizontal(float angle) {
-            targetHorizontalAngle = angle;
+            targetHorizontalAngle = NormalizeAngle(angle);
             UpdateTargetDisplay();
             UpdateDisplay();
         }
@@ -224,5 +324,7 @@ namespace BNG {
                    IsAngleInRange(currentHorizontal, targetHorizontalAngle, angleTolerance) &&
                    IsSpeedInRange(currentSpeed, targetSpeedPercent, speedTolerance);
         }
+        
+        public bool IsLocked() => controlsLocked;
     }
 }
