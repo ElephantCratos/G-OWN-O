@@ -40,7 +40,7 @@ public class HoleSpawner : MonoBehaviour
     [Header("Event Integration")]
     public DayEventManager dayEventManager;
     public int holesToPatch = 5;
-    private int patchedHoles = 0;
+    public int patchedHoles = 0;
 
     [Header("Hole Spawn Settings")]
     public GameObject HolePrefab;

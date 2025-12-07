@@ -15,7 +15,7 @@ public class RatSpawner : MonoBehaviour
     [Header("Event Integration")]
     public DayEventManager dayEventManager;
     public int ratsToKill = 10;
-    private int killedRats = 0;
+    public int killedRats = 0;
 
     [Header("Rat Spawn Settings")]
     public GameObject RatPrefab;
