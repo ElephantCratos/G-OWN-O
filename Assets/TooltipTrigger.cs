@@ -65,7 +65,7 @@ foreach (Transform t in allTransforms)
 }
     
     // Теперь установить правильную позицию root'а
-    tooltipInstance.transform.localPosition = spawnOffset;
+    tooltipInstance.transform.position = transform.position + transform.TransformDirection(spawnOffset);
     tooltipInstance.transform.localRotation = Quaternion.identity;
     tooltipInstance.transform.localScale = Vector3.one;
     
