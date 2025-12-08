@@ -148856,13 +148856,29 @@ GameObject:
   - component: {fileID: 746339593}
   - component: {fileID: 746339592}
   - component: {fileID: 746339591}
-  m_Layer: 0
+  - component: {fileID: 746339590}
+  m_Layer: 11
   m_Name: ControlPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &746339590
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 746339589}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbe727247720c874f943c8259d5966c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Title: "\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435"
+  Description: "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u043E\u0431\u044A\u0435\u043A\u0442\u0430"
+  Icon: {fileID: 0}
 --- !u!65 &746339591
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -200427,6 +200443,65 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1463626435}
   m_Mesh: {fileID: 4300000, guid: 1f61f9023149fdd4f8030b05848fbb9b, type: 3}
+--- !u!1 &1465003754
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1465003756}
+  - component: {fileID: 1465003755}
+  m_Layer: 0
+  m_Name: HandTooltipSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1465003755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1465003754}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa10741810d4adb4191f5a67148324ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  handAnchor: {fileID: 1849165695}
+  headTransform: {fileID: 0}
+  tooltipOffset: {x: 0.2, y: 0.1, z: 0.2}
+  smoothSpeed: 15
+  tooltipWidth: 400
+  tooltipHeight: 200
+  worldScale: 0.001
+  backgroundColor: {r: 0.1, g: 0.1, b: 0.15, a: 0.95}
+  titleColor: {r: 0.3, g: 0.8, b: 1, a: 1}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  maxDistance: 10
+  tooltipTargetLayer:
+    serializedVersion: 2
+    m_Bits: 2048
+  controllerHand: 1
+  showDebugLogs: 1
+--- !u!4 &1465003756
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1465003754}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 19.004787, y: -0.9099515, z: 2.5764065}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 34
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1466892692
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -216180,7 +216255,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh31994
+  m_Name: pb_Mesh2413956
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
@@ -236298,6 +236373,12 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1845798414}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1849165695 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2683195716759038844, guid: 4ac7df741a9c0a2418ec19477729ee3d,
+    type: 3}
+  m_PrefabInstance: {fileID: 2634128103435655830}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1849260871
 GameObject:
   m_ObjectHideFlags: 0
@@ -258686,7 +258767,7 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: pb_Mesh23166
+  m_Name: pb_Mesh2405122
   serializedVersion: 10
   m_SubMeshes:
   - serializedVersion: 2
