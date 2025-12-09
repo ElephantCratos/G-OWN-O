@@ -41,7 +41,7 @@ namespace VRMenu
         private const float MENU_HEIGHT = 500f;
         private const float BUTTON_HEIGHT = 60f;
         private const float BUTTON_SPACING = 15f;
-        private const float WORLD_SCALE = 0.002f;
+        private const float WORLD_SCALE = 0.004f;
         
         private const string VOLUME_KEY = "MasterVolume";
 
@@ -181,7 +181,7 @@ namespace VRMenu
             bgRect.anchorMax = new Vector2(0.5f, 0.5f);
             bgRect.pivot = new Vector2(0.5f, 0.5f);
             
-            GameObject titleObj = CreateText(settingsPanel.transform, "Title", "НАСТРОЙКИ", 32, FontStyles.Bold);
+            GameObject titleObj = CreateText(settingsPanel.transform, "Title", "НАСТРОИКИ", 32, FontStyles.Bold);
             RectTransform titleRect = titleObj.GetComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0, 0.85f);
             titleRect.anchorMax = new Vector2(1, 1f);
@@ -213,7 +213,7 @@ namespace VRMenu
             sliderContainerRect.anchoredPosition = new Vector2(0, 50);
             sliderContainerRect.sizeDelta = new Vector2(MENU_WIDTH * 0.85f, 80);
             
-            volumeSlider = CreateVolumeSlider(sliderContainerRect, "Volume", "ГРОМКОСТЬ", out volumeValueText);
+            volumeSlider = CreateVolumeSlider(sliderContainerRect, "Volume", "ГРОMКОСТЬ", out volumeValueText);
             
             // Back button
             GameObject backContainer = new GameObject("BackContainer");
