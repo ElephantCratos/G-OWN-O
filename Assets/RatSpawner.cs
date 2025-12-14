@@ -61,7 +61,24 @@ public class RatSpawner : MonoBehaviour
         }
         spawnedRats.Clear();
     }
+    /// <summary>
+/// Возвращает количество живых крыс (для GameOverManager)
+/// </summary>
+public int GetAliveRatsCount()
+{
+    // Удаляем null объекты перед подсчётом
+    spawnedRats.RemoveAll(r => r == null);
+    return spawnedRats.Count;
+}
 
+/// <summary>
+/// Возвращает список живых крыс (для дополнительной логики)
+/// </summary>
+public List<GameObject> GetAliveRats()
+{
+    spawnedRats.RemoveAll(r => r == null);
+    return new List<GameObject>(spawnedRats);
+}
     public void SpawnRats()
     {
         if (RatPrefab == null)

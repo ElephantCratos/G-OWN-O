@@ -140215,17 +140215,17 @@ PrefabInstance:
     - target: {fileID: 2109111115295015119, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
       propertyPath: m_ConnectedAnchor.x
-      value: 0.00000015459955
+      value: 0.00000025494955
       objectReference: {fileID: 0}
     - target: {fileID: 2109111115295015119, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
       propertyPath: m_ConnectedAnchor.y
-      value: 0.02139985
+      value: 0.021399148
       objectReference: {fileID: 0}
     - target: {fileID: 2109111115295015119, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
       propertyPath: m_ConnectedAnchor.z
-      value: -0.000000013969839
+      value: 0.0000000055879354
       objectReference: {fileID: 0}
     - target: {fileID: 2109111116582765845, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
@@ -140235,7 +140235,7 @@ PrefabInstance:
     - target: {fileID: 2109111116582765850, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
       propertyPath: m_RootOrder
-      value: 5
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 2109111116582765850, guid: a2419f9845db03f479057114b6bbbe86,
         type: 3}
@@ -156262,6 +156262,7 @@ GameObject:
   m_Component:
   - component: {fileID: 849538653}
   - component: {fileID: 849538651}
+  - component: {fileID: 849538652}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -156314,6 +156315,60 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &849538652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 849538650}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 991f890a061bd9e4d805378df3e042f9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hullIntegrity: 100
+  integrityLossPerHole: 8
+  criticalIntegrityLevel: 20
+  playerHealth: 100
+  maxPlayerHealth: 100
+  ratDamagePerSecond: 5
+  healthRegenerationRate: 2
+  controlMalfunctionTimer: 0
+  maxControlMalfunctionTime: 300
+  batteryEmptyTimer: 0
+  maxBatteryEmptyTime: 30
+  holeSpawnInterval: 5
+  oxygenLevel: 100
+  oxygenDepletionRate: 5
+  criticalOxygenLevel: 0
+  holeSpawner: {fileID: 1429217363}
+  ratSpawner: {fileID: 1530978265}
+  controlPanelMalfunction: {fileID: 768859446}
+  batteryReplacementEvent: {fileID: 1957394329}
+  pinReplacementTask: {fileID: 867766339}
+  attachModel: {fileID: 1896315088}
+  dayEventManager: {fileID: 849538651}
+  OnHullIntegrityChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  OnPlayerHealthChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  OnOxygenLevelChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  OnGameOver:
+    m_PersistentCalls:
+      m_Calls: []
+  OnCriticalWarning:
+    m_PersistentCalls:
+      m_Calls: []
+  criticalHullEffects: {fileID: 0}
+  criticalHealthEffects: {fileID: 0}
+  criticalOxygenEffects: {fileID: 0}
+  gameOverSceneName: MainMenu
+  gameOverDelay: 3
 --- !u!4 &849538653
 Transform:
   m_ObjectHideFlags: 0
@@ -158284,7 +158339,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 539207292}
-  m_RootOrder: 5
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!65 &870486487
 BoxCollider:
@@ -210116,7 +210171,7 @@ PrefabInstance:
     - target: {fileID: 6543909706854340531, guid: 858d45f4977607b4b9b2a2000bdf284d,
         type: 3}
       propertyPath: m_RootOrder
-      value: 4
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 6543909707988671815, guid: 858d45f4977607b4b9b2a2000bdf284d,
         type: 3}

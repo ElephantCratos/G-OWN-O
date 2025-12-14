@@ -74,6 +74,7 @@ public class HoleSpawner : MonoBehaviour
         Debug.Log("Ивент с пробоинами завершён!");
     }
 
+
     private void SpawnHoles()
     {
         if (HolePrefab == null)
@@ -115,8 +116,28 @@ public class HoleSpawner : MonoBehaviour
 
         Debug.Log($"Создано пробоин: {spawnedHoles.Count}");
     }
+    /// <summary>
+/// Возвращает количество активных дыр (для GameOverManager)
+/// </summary>
+public int GetActiveHolesCount()
+{
+    // Удаляем null объекты перед подсчётом
+    spawnedHoles.RemoveAll(h => h == null);
+    return spawnedHoles.Count;
+}
 
-    private void GetRandomPointOnWall(BoxCollider zone, out Vector3 position, out Quaternion rotation)
+/// <summary>
+/// Возвращает список активных дыр (для дополнительной логики)
+/// </summary>
+public List<GameObject> GetActiveHoles()
+{
+    spawnedHoles.RemoveAll(h => h == null);
+    return new List<GameObject>(spawnedHoles);
+}
+
+
+
+    public void GetRandomPointOnWall(BoxCollider zone, out Vector3 position, out Quaternion rotation)
     {
         Transform zoneTransform = zone.transform;
         
@@ -497,7 +518,45 @@ public class HoleSpawner : MonoBehaviour
         }
         #endif
     }
+/// <summary>
+/// Публичный метод для создания одной дыры (для GameOverManager)
+/// </summary>
+public void SpawnSingleHole()
+{
+    if (HolePrefab == null)
+    {
+        Debug.LogWarning("HoleSpawner: не назначен HolePrefab!");
+        return;
+    }
 
+    if (wallSpawnZones.Count == 0)
+    {
+        Debug.LogWarning("HoleSpawner: нет зон спавна на стенах!");
+        return;
+    }
+
+    BoxCollider zone = wallSpawnZones[Random.Range(0, wallSpawnZones.Count)];
+    
+    Vector3 spawnPos;
+    Quaternion spawnRot;
+    GetRandomPointOnWall(zone, out spawnPos, out spawnRot);
+
+    GameObject hole = Instantiate(HolePrefab, spawnPos, spawnRot);
+    
+    // Если ивент активен, отслеживаем заваривание
+    if (eventActive)
+    {
+        PatchableHole patchable = hole.GetComponent<PatchableHole>();
+        if (patchable != null)
+        {
+            StartCoroutine(WatchHolePatch(patchable));
+        }
+    }
+    
+    spawnedHoles.Add(hole);
+    
+    Debug.Log($"💥 Создана экстренная пробоина! Всего дыр: {spawnedHoles.Count}");
+}
     private void DrawArrow(Vector3 pos, Vector3 direction)
     {
         Gizmos.DrawRay(pos, direction);
