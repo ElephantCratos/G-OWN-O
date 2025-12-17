@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.SceneManagement;
 
 namespace BNG
 {
@@ -22,8 +23,6 @@ namespace BNG
         [Header("Здоровье игрока")]
         public float playerHealth = 100f;
         public float maxPlayerHealth = 100f;
-        public float ratDamagePerSecond = 5f;
-        public float healthRegenerationRate = 2f;
         public float healthRegenerationRate = 2f;
         
         [Header("Система укусов крыс")]
@@ -66,7 +65,6 @@ namespace BNG
         public AttachModel attachModel;
         public DayEventManager dayEventManager;
         
-
         [Header("=== UI И ЭФФЕКТЫ ===")]
         public UnityEvent<float> OnHullIntegrityChanged;
         public UnityEvent<float> OnPlayerHealthChanged;
@@ -81,13 +79,8 @@ namespace BNG
         
         [Header("Настройки Game Over")]
         public bool useGameOverUI = true; // ⬅️ НОВОЕ: Использовать UI вместо прямой загрузки сцены
-
-        [Header("=== СОБЫТИЯ ===")]
-        public UnityEvent<float> OnHullIntegrityChanged;
-        public UnityEvent<float> OnPlayerHealthChanged;
-        public UnityEvent<float> OnOxygenLevelChanged;
-        public UnityEvent<string> OnGameOver;
-        public UnityEvent OnCriticalWarning;
+        public string gameOverSceneName = "MainMenu";
+        public float gameOverDelay = 3f;
         
         [Header("События укусов и индикаторов")]
         [Tooltip("Вызывается при каждом укусе крысы (передаёт урон)")]
@@ -102,11 +95,6 @@ namespace BNG
         public UnityEvent OnOxygenWarning;
         [Tooltip("Вызывается при проблемах с управлением")]
         public UnityEvent OnControlWarning;
-        
-        [Header("=== ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ===")]
-        public GameObject criticalHullEffects;
-        public GameObject criticalHealthEffects;
-        public GameObject criticalOxygenEffects;
         
         [Header("Эффекты укуса")]
         [Tooltip("Красная виньетка при укусе")]
@@ -134,11 +122,6 @@ namespace BNG
         [Range(0f, 1f)]
         public float biteVibrationIntensity = 0.7f;
         public float biteVibrationDuration = 0.2f;
-        
-        [Header("Настройки Game Over")]
-
-        public string gameOverSceneName = "MainMenu";
-        public float gameOverDelay = 3f;
         
         private bool isGameOver = false;
         private bool wasLowHealth = false;
@@ -216,15 +199,6 @@ namespace BNG
         
         void UpdatePlayerHealth()
         {
-
-            if (ratSpawner == null) return;
-            
-            int aliveRats = ratSpawner.GetAliveRatsCount();
-            
-            if (aliveRats > 0)
-            {
-                float damage = ratDamagePerSecond * Time.deltaTime * Mathf.Min(aliveRats, 10);
-                playerHealth -= damage;
             if (ratSpawner == null || playerTransform == null)
             {
                 // Если нет спавнера или игрока, просто регенерируем
@@ -237,8 +211,6 @@ namespace BNG
             
             if (aliveRats == null || aliveRats.Count == 0)
             {
-
-                playerHealth += healthRegenerationRate * Time.deltaTime;
                 RegenerateHealth();
                 CleanupRatCooldowns();
                 return;
@@ -644,7 +616,6 @@ namespace BNG
             {
                 StartCoroutine(GameOverSequence(reason));
             }
-            StartCoroutine(GameOverSequence(reason));
         }
         
         void StopAllSystems()
@@ -662,7 +633,6 @@ namespace BNG
         IEnumerator GameOverSequence(string reason)
         {
             yield return new WaitForSeconds(gameOverDelay);
-            UnityEngine.SceneManagement.SceneManager.LoadScene(gameOverSceneName);
             
             if (!string.IsNullOrEmpty(gameOverSceneName))
             {
@@ -673,7 +643,6 @@ namespace BNG
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
-}
         
         #endregion
         
