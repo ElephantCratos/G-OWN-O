@@ -16,28 +16,42 @@ namespace BNG
         [Header("Герметичность корпуса")]
         [Range(0f, 100f)]
         public float hullIntegrity = 100f;
-        public float integrityLossPerHole = 8f; // -8% за каждую дыру
-        public float criticalIntegrityLevel = 20f; // Game Over если <20%
+        public float integrityLossPerHole = 8f;
+        public float criticalIntegrityLevel = 20f;
         
         [Header("Здоровье игрока")]
         public float playerHealth = 100f;
         public float maxPlayerHealth = 100f;
-        public float ratDamagePerSecond = 5f;
-        public float healthRegenerationRate = 2f; // +2 HP/сек без крыс
+        public float healthRegenerationRate = 2f;
+        
+        [Header("Система укусов крыс")]
+        [Tooltip("Урон от одного укуса")]
+        public float ratBiteDamage = 10f;
+        [Tooltip("Интервал между укусами одной крысы (секунды)")]
+        public float biteCooldown = 1.5f;
+        [Tooltip("Радиус атаки крысы")]
+        public float ratAttackRange = 1.5f;
+        [Tooltip("Максимум крыс, которые могут кусать одновременно")]
+        public int maxSimultaneousBites = 5;
+        [Tooltip("Ссылка на трансформ игрока")]
+        public Transform playerTransform;
+        
+        // Словарь для отслеживания кулдауна укусов каждой крысы
+        private Dictionary<GameObject, float> ratBiteCooldowns = new Dictionary<GameObject, float>();
         
         [Header("Потеря управления")]
         public float controlMalfunctionTimer = 0f;
-        public float maxControlMalfunctionTime = 300f; // 5 минут
+        public float maxControlMalfunctionTime = 300f;
         
         [Header("Критическая ситуация с батареей")]
         public float batteryEmptyTimer = 0f;
-        public float maxBatteryEmptyTime = 30f; // 30 секунд до новых дыр
-        public float holeSpawnInterval = 5f; // Новая дыра каждые 5 сек
+        public float maxBatteryEmptyTime = 30f;
+        public float holeSpawnInterval = 5f;
         private float nextHoleSpawnTime = 0f;
         
         [Header("Критическая ситуация с пинами")]
         public float oxygenLevel = 100f;
-        public float oxygenDepletionRate = 5f; // -5% кислорода в секунду
+        public float oxygenDepletionRate = 5f;
         public float criticalOxygenLevel = 0f;
         private bool isOxygenCritical = false;
         
@@ -50,36 +64,104 @@ namespace BNG
         public AttachModel attachModel;
         public DayEventManager dayEventManager;
         
-        [Header("=== UI И ЭФФЕКТЫ ===")]
-        public UnityEvent<float> OnHullIntegrityChanged; // Передаёт %
-        public UnityEvent<float> OnPlayerHealthChanged; // Передаёт HP
-        public UnityEvent<float> OnOxygenLevelChanged; // Передаёт %
-        public UnityEvent<string> OnGameOver; // Передаёт причину
-        public UnityEvent OnCriticalWarning; // Критическое состояние
+        [Header("=== СОБЫТИЯ ===")]
+        public UnityEvent<float> OnHullIntegrityChanged;
+        public UnityEvent<float> OnPlayerHealthChanged;
+        public UnityEvent<float> OnOxygenLevelChanged;
+        public UnityEvent<string> OnGameOver;
+        public UnityEvent OnCriticalWarning;
         
-        [Header("Визуальные эффекты")]
-        public GameObject criticalHullEffects; // Красные огни, сирена
-        public GameObject criticalHealthEffects; // Красный экран
-        public GameObject criticalOxygenEffects; // Синий туман
+        [Header("События укусов и индикаторов")]
+        [Tooltip("Вызывается при каждом укусе крысы (передаёт урон)")]
+        public UnityEvent<float> OnRatBite;
+        [Tooltip("Вызывается при критическом здоровье (<30%)")]
+        public UnityEvent OnLowHealthWarning;
+        [Tooltip("Вызывается когда здоровье восстановилось")]
+        public UnityEvent OnHealthRestored;
+        [Tooltip("Вызывается при критической герметичности")]
+        public UnityEvent OnHullBreachWarning;
+        [Tooltip("Вызывается при проблемах с кислородом")]
+        public UnityEvent OnOxygenWarning;
+        [Tooltip("Вызывается при проблемах с управлением")]
+        public UnityEvent OnControlWarning;
+        
+        [Header("=== ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ===")]
+        public GameObject criticalHullEffects;
+        public GameObject criticalHealthEffects;
+        public GameObject criticalOxygenEffects;
+        
+        [Header("Эффекты укуса")]
+        [Tooltip("Красная виньетка при укусе")]
+        public GameObject biteDamageVignette;
+        [Tooltip("Длительность эффекта укуса")]
+        public float biteEffectDuration = 0.3f;
+        [Tooltip("Аудио укуса")]
+        public AudioSource biteAudioSource;
+        public AudioClip[] biteAudioClips;
+        
+        [Header("Индикаторы проблем (UI)")]
+        [Tooltip("Иконка проблемы с герметичностью")]
+        public GameObject hullWarningIndicator;
+        [Tooltip("Иконка проблемы со здоровьем")]
+        public GameObject healthWarningIndicator;
+        [Tooltip("Иконка проблемы с кислородом")]
+        public GameObject oxygenWarningIndicator;
+        [Tooltip("Иконка проблемы с управлением")]
+        public GameObject controlWarningIndicator;
+        [Tooltip("Иконка проблемы с батареей")]
+        public GameObject batteryWarningIndicator;
+        
+        [Header("Вибрация контроллера (VR)")]
+        public bool enableControllerVibration = true;
+        [Range(0f, 1f)]
+        public float biteVibrationIntensity = 0.7f;
+        public float biteVibrationDuration = 0.2f;
         
         [Header("Настройки Game Over")]
-        public string gameOverSceneName = "MainMenu"; // Сцена для перезагрузки
-        public float gameOverDelay = 3f; // Задержка перед Game Over
+        public string gameOverSceneName = "MainMenu";
+        public float gameOverDelay = 3f;
         
         private bool isGameOver = false;
+        private bool wasLowHealth = false;
+        private Coroutine biteEffectCoroutine;
+        
+        void Start()
+        {
+            // Автопоиск игрока если не назначен
+            if (playerTransform == null)
+            {
+                GameObject player = GameObject.FindGameObjectWithTag("Player");
+                if (player != null)
+                    playerTransform = player.transform;
+                else
+                {
+                    // Пробуем найти камеру VR
+                    Camera mainCam = Camera.main;
+                    if (mainCam != null)
+                        playerTransform = mainCam.transform;
+                }
+            }
+            
+            // Скрываем все индикаторы на старте
+            SetIndicatorActive(hullWarningIndicator, false);
+            SetIndicatorActive(healthWarningIndicator, false);
+            SetIndicatorActive(oxygenWarningIndicator, false);
+            SetIndicatorActive(controlWarningIndicator, false);
+            SetIndicatorActive(batteryWarningIndicator, false);
+            SetIndicatorActive(biteDamageVignette, false);
+        }
         
         void Update()
         {
             if (isGameOver) return;
             
-            // Обновляем все системы
             UpdateHullIntegrity();
             UpdatePlayerHealth();
             UpdateControlMalfunction();
             UpdateBatteryEmergency();
             UpdateOxygenSystem();
+            UpdateWarningIndicators();
             
-            // Проверяем условия поражения
             CheckGameOverConditions();
         }
         
@@ -89,57 +171,228 @@ namespace BNG
         {
             if (holeSpawner == null) return;
             
-            // Считаем активные дыры
             int activeHoles = holeSpawner.GetActiveHolesCount();
-            
-            // Целевая герметичность = 100% - (количество_дыр × потеря_на_дыру)
             float targetIntegrity = 100f - (activeHoles * integrityLossPerHole);
             targetIntegrity = Mathf.Clamp(targetIntegrity, 0f, 100f);
             
-            // Плавно меняем герметичность
             hullIntegrity = Mathf.Lerp(hullIntegrity, targetIntegrity, Time.deltaTime * 2f);
             
             OnHullIntegrityChanged?.Invoke(hullIntegrity);
             
-            // Визуальные эффекты при критической герметичности
             if (criticalHullEffects != null)
             {
                 criticalHullEffects.SetActive(hullIntegrity < 40f);
+            }
+            
+            // Предупреждение при критической герметичности
+            if (hullIntegrity < 40f && hullIntegrity >= criticalIntegrityLevel)
+            {
+                OnHullBreachWarning?.Invoke();
             }
         }
         
         #endregion
         
-        #region Player Health System
+        #region Player Health System (с системой укусов)
         
         void UpdatePlayerHealth()
         {
-            if (ratSpawner == null) return;
-            
-            // Считаем живых крыс рядом с игроком (упрощённо - все живые крысы)
-            int aliveRats = ratSpawner.GetAliveRatsCount();
-            
-            if (aliveRats > 0)
+            if (ratSpawner == null || playerTransform == null)
             {
-                // Крысы атакуют - наносим урон
-                float damage = ratDamagePerSecond * Time.deltaTime * Mathf.Min(aliveRats, 10); // Макс 10 крыс одновременно
-                playerHealth -= damage;
+                // Если нет спавнера или игрока, просто регенерируем
+                RegenerateHealth();
+                return;
             }
-            else
+            
+            // Получаем список живых крыс
+            List<GameObject> aliveRats = ratSpawner.GetAliveRats();
+            
+            if (aliveRats == null || aliveRats.Count == 0)
             {
-                // Нет крыс - восстанавливаем здоровье
-                playerHealth += healthRegenerationRate * Time.deltaTime;
+                RegenerateHealth();
+                CleanupRatCooldowns();
+                return;
+            }
+            
+            // Очищаем мёртвых крыс из словаря кулдаунов
+            CleanupRatCooldowns();
+            
+            int bitesThisFrame = 0;
+            
+            foreach (GameObject rat in aliveRats)
+            {
+                if (rat == null) continue;
+                if (bitesThisFrame >= maxSimultaneousBites) break;
+                
+                // Проверяем расстояние до игрока
+                float distance = Vector3.Distance(rat.transform.position, playerTransform.position);
+                
+                if (distance <= ratAttackRange)
+                {
+                    // Крыса в радиусе атаки — проверяем кулдаун
+                    if (CanRatBite(rat))
+                    {
+                        PerformRatBite(rat);
+                        bitesThisFrame++;
+                    }
+                }
+            }
+            
+            // Обновляем кулдауны
+            UpdateRatCooldowns();
+            
+            // Если крыс рядом нет — регенерация
+            if (bitesThisFrame == 0 && !IsAnyRatNearby(aliveRats))
+            {
+                RegenerateHealth();
             }
             
             playerHealth = Mathf.Clamp(playerHealth, 0f, maxPlayerHealth);
-            
             OnPlayerHealthChanged?.Invoke(playerHealth);
+            
+            // Проверяем состояние здоровья для событий
+            CheckHealthState();
             
             // Визуальные эффекты при низком здоровье
             if (criticalHealthEffects != null)
             {
                 criticalHealthEffects.SetActive(playerHealth < 30f);
             }
+        }
+        
+        bool IsAnyRatNearby(List<GameObject> rats)
+        {
+            foreach (GameObject rat in rats)
+            {
+                if (rat == null) continue;
+                float distance = Vector3.Distance(rat.transform.position, playerTransform.position);
+                if (distance <= ratAttackRange * 1.5f) // Небольшой буфер
+                    return true;
+            }
+            return false;
+        }
+        
+        bool CanRatBite(GameObject rat)
+        {
+            if (!ratBiteCooldowns.ContainsKey(rat))
+            {
+                ratBiteCooldowns[rat] = 0f;
+                return true;
+            }
+            
+            return ratBiteCooldowns[rat] <= 0f;
+        }
+        
+        void PerformRatBite(GameObject rat)
+        {
+            // Наносим урон
+            playerHealth -= ratBiteDamage;
+            
+            // Устанавливаем кулдаун для этой крысы
+            ratBiteCooldowns[rat] = biteCooldown;
+            
+            // Вызываем событие укуса
+            OnRatBite?.Invoke(ratBiteDamage);
+            
+            // Визуальные и звуковые эффекты
+            PlayBiteEffects();
+            
+            // Вибрация контроллера
+            if (enableControllerVibration)
+            {
+                TriggerControllerVibration();
+            }
+            
+            Debug.Log($"🐀 Крыса укусила! Урон: {ratBiteDamage}, Здоровье: {playerHealth:F0}");
+        }
+        
+        void PlayBiteEffects()
+        {
+            // Красная виньетка
+            if (biteDamageVignette != null)
+            {
+                if (biteEffectCoroutine != null)
+                    StopCoroutine(biteEffectCoroutine);
+                biteEffectCoroutine = StartCoroutine(ShowBiteVignette());
+            }
+            
+            // Звук укуса
+            if (biteAudioSource != null && biteAudioClips != null && biteAudioClips.Length > 0)
+            {
+                AudioClip clip = biteAudioClips[Random.Range(0, biteAudioClips.Length)];
+                biteAudioSource.PlayOneShot(clip);
+            }
+        }
+        
+        IEnumerator ShowBiteVignette()
+        {
+            SetIndicatorActive(biteDamageVignette, true);
+            yield return new WaitForSeconds(biteEffectDuration);
+            SetIndicatorActive(biteDamageVignette, false);
+        }
+        
+        void TriggerControllerVibration()
+        {
+            // Для BNG Framework
+            if (InputBridge.Instance != null)
+            {
+                InputBridge.Instance.VibrateController(biteVibrationIntensity, biteVibrationIntensity, 
+                    biteVibrationDuration, ControllerHand.Left);
+                InputBridge.Instance.VibrateController(biteVibrationIntensity, biteVibrationIntensity, 
+                    biteVibrationDuration, ControllerHand.Right);
+            }
+        }
+        
+        void UpdateRatCooldowns()
+        {
+            List<GameObject> keys = new List<GameObject>(ratBiteCooldowns.Keys);
+            foreach (GameObject rat in keys)
+            {
+                if (ratBiteCooldowns[rat] > 0f)
+                {
+                    ratBiteCooldowns[rat] -= Time.deltaTime;
+                }
+            }
+        }
+        
+        void CleanupRatCooldowns()
+        {
+            List<GameObject> toRemove = new List<GameObject>();
+            foreach (var kvp in ratBiteCooldowns)
+            {
+                if (kvp.Key == null)
+                    toRemove.Add(kvp.Key);
+            }
+            foreach (var key in toRemove)
+            {
+                ratBiteCooldowns.Remove(key);
+            }
+        }
+        
+        void RegenerateHealth()
+        {
+            if (playerHealth < maxPlayerHealth)
+            {
+                playerHealth += healthRegenerationRate * Time.deltaTime;
+            }
+        }
+        
+        void CheckHealthState()
+        {
+            bool isLowHealth = playerHealth < 30f;
+            
+            if (isLowHealth && !wasLowHealth)
+            {
+                OnLowHealthWarning?.Invoke();
+                Debug.LogWarning("⚠️ Критически низкое здоровье!");
+            }
+            else if (!isLowHealth && wasLowHealth)
+            {
+                OnHealthRestored?.Invoke();
+                Debug.Log("✓ Здоровье восстановлено");
+            }
+            
+            wasLowHealth = isLowHealth;
         }
         
         #endregion
@@ -154,16 +407,15 @@ namespace BNG
             {
                 controlMalfunctionTimer += Time.deltaTime;
                 
-                // Предупреждение на 4 минуте
                 if (controlMalfunctionTimer >= 240f && controlMalfunctionTimer < 240.5f)
                 {
                     OnCriticalWarning?.Invoke();
+                    OnControlWarning?.Invoke();
                     Debug.LogWarning("⚠️ КРИТИЧЕСКОЕ: Осталась 1 минута до потери управления!");
                 }
             }
             else
             {
-                // Параметры в норме - обнуляем таймер
                 controlMalfunctionTimer = 0f;
             }
         }
@@ -176,32 +428,27 @@ namespace BNG
         {
             if (batteryReplacementEvent == null || holeSpawner == null) return;
             
-            // Проверяем: батарея разряжена и не заменена
             bool isBatteryEmpty = batteryReplacementEvent.IsEventActive && !batteryReplacementEvent.IsCompleted;
             
             if (isBatteryEmpty)
             {
                 batteryEmptyTimer += Time.deltaTime;
                 
-                // Предупреждение на 25 секунде
                 if (batteryEmptyTimer >= 25f && batteryEmptyTimer < 25.5f)
                 {
                     OnCriticalWarning?.Invoke();
                     Debug.LogWarning("⚠️ КРИТИЧЕСКОЕ: Батарея разряжена! Начинается обстрел корабля!");
                 }
                 
-                // Каждые 5 секунд создаём новую дыру
                 if (batteryEmptyTimer >= nextHoleSpawnTime)
                 {
                     SpawnEmergencyHole();
                     nextHoleSpawnTime = batteryEmptyTimer + holeSpawnInterval;
-                    
                     Debug.LogWarning($"💥 Без защиты батарей! Новая пробоина! (Таймер: {batteryEmptyTimer:F0}с)");
                 }
             }
             else
             {
-                // Батарея в порядке - сбрасываем таймер
                 batteryEmptyTimer = 0f;
                 nextHoleSpawnTime = holeSpawnInterval;
             }
@@ -210,8 +457,6 @@ namespace BNG
         void SpawnEmergencyHole()
         {
             if (holeSpawner == null) return;
-            
-            // Используем публичный метод HoleSpawner
             holeSpawner.SpawnSingleHole();
         }
         
@@ -223,7 +468,6 @@ namespace BNG
         {
             if (attachModel == null) return;
             
-            // Проверяем: все ли пины вынуты ИЛИ все имеют износ >90%
             bool isCriticalPinSituation = CheckPinCriticalCondition();
             
             if (isCriticalPinSituation)
@@ -232,10 +476,10 @@ namespace BNG
                 {
                     isOxygenCritical = true;
                     OnCriticalWarning?.Invoke();
+                    OnOxygenWarning?.Invoke();
                     Debug.LogWarning("⚠️ КРИТИЧЕСКОЕ: Все пины вынуты или изношены! Кислород падает!");
                 }
                 
-                // Снижаем кислород
                 oxygenLevel -= oxygenDepletionRate * Time.deltaTime;
                 oxygenLevel = Mathf.Clamp(oxygenLevel, 0f, 100f);
                 
@@ -252,7 +496,6 @@ namespace BNG
                     Debug.Log("✓ Кислород восстановлен - пин вставлен!");
                 }
                 
-                // Восстанавливаем кислород
                 oxygenLevel += (oxygenDepletionRate / 2f) * Time.deltaTime;
                 oxygenLevel = Mathf.Clamp(oxygenLevel, 0f, 100f);
                 
@@ -270,11 +513,9 @@ namespace BNG
             int socketsCount = attachModel.InsertPoints.Count;
             List<GameObject> insertedPins = attachModel.GetInsertedPins();
             
-            // Условие 1: Все пины вынуты
             if (insertedPins.Count == 0)
                 return true;
             
-            // Условие 2: Все вставленные пины имеют износ >= 90%
             bool hasGoodPin = false;
             foreach (GameObject pin in insertedPins)
             {
@@ -291,43 +532,62 @@ namespace BNG
         
         #endregion
         
+        #region Warning Indicators
+        
+        void UpdateWarningIndicators()
+        {
+            // Индикатор герметичности
+            SetIndicatorActive(hullWarningIndicator, hullIntegrity < 50f);
+            
+            // Индикатор здоровья
+            SetIndicatorActive(healthWarningIndicator, playerHealth < 50f);
+            
+            // Индикатор кислорода
+            SetIndicatorActive(oxygenWarningIndicator, oxygenLevel < 50f || isOxygenCritical);
+            
+            // Индикатор управления
+            SetIndicatorActive(controlWarningIndicator, controlMalfunctionTimer > 0f);
+            
+            // Индикатор батареи
+            SetIndicatorActive(batteryWarningIndicator, batteryEmptyTimer > 0f);
+        }
+        
+        void SetIndicatorActive(GameObject indicator, bool active)
+        {
+            if (indicator != null && indicator.activeSelf != active)
+            {
+                indicator.SetActive(active);
+            }
+        }
+        
+        #endregion
+        
         #region Game Over Conditions
         
         void CheckGameOverConditions()
         {
-            // 1. Критическая разгерметизация
             if (hullIntegrity <= criticalIntegrityLevel)
             {
                 TriggerGameOver($"Критическая разгерметизация! Герметичность: {hullIntegrity:F0}%");
                 return;
             }
             
-            // 2. Смерть от крыс
             if (playerHealth <= 0f)
             {
                 TriggerGameOver("Вы погибли от укусов крыс!");
                 return;
             }
             
-            // 3. Потеря управления кораблём
             if (controlMalfunctionTimer >= maxControlMalfunctionTime)
             {
                 TriggerGameOver("Корабль потерян в космосе! Управление не восстановлено.");
                 return;
             }
             
-            // 4. Критическая нехватка кислорода
             if (oxygenLevel <= criticalOxygenLevel)
             {
                 TriggerGameOver("Кислород закончился! Все системы креплений отказали.");
                 return;
-            }
-            
-            // 5. Слишком долго без батареи (опционально - если хотите жёсткий лимит)
-            if (batteryEmptyTimer >= maxBatteryEmptyTime)
-            {
-                // Можно добавить Game Over или оставить только спавн дыр
-                // TriggerGameOver("Корабль уничтожен без защиты батарей!");
             }
         }
         
@@ -346,20 +606,15 @@ namespace BNG
             
             OnGameOver?.Invoke(reason);
             
-            // Останавливаем все системы
             StopAllSystems();
-            
-            // Запускаем перезагрузку
             StartCoroutine(GameOverSequence(reason));
         }
         
         void StopAllSystems()
         {
-            // Останавливаем спавн крыс
             if (ratSpawner != null)
                 ratSpawner.StopSpawning();
             
-            // Останавливаем все активные ивенты
             if (holeSpawner != null)
                 holeSpawner.StopHoleEvent();
             
@@ -369,30 +624,49 @@ namespace BNG
         
         IEnumerator GameOverSequence(string reason)
         {
-            // Показываем экран Game Over с задержкой
             yield return new WaitForSeconds(gameOverDelay);
             
-            // Перезагружаем сцену или переходим в меню
             if (!string.IsNullOrEmpty(gameOverSceneName))
             {
                 SceneManager.LoadScene(gameOverSceneName);
             }
             else
             {
-                // Альтернатива: перезагрузка текущей сцены
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
         
         #endregion
         
-        #region Public Methods (для UI и отладки)
+        #region Public Methods
+        
+        /// <summary>
+        /// Получить количество крыс рядом с игроком
+        /// </summary>
+        public int GetNearbyRatsCount()
+        {
+            if (ratSpawner == null || playerTransform == null) return 0;
+            
+            List<GameObject> rats = ratSpawner.GetAliveRats();
+            int count = 0;
+            
+            foreach (GameObject rat in rats)
+            {
+                if (rat == null) continue;
+                if (Vector3.Distance(rat.transform.position, playerTransform.position) <= ratAttackRange)
+                    count++;
+            }
+            
+            return count;
+        }
         
         public string GetSystemStatus()
         {
+            int nearbyRats = GetNearbyRatsCount();
             return $"Герметичность: {hullIntegrity:F0}%\n" +
                    $"Здоровье: {playerHealth:F0}/{maxPlayerHealth}\n" +
                    $"Кислород: {oxygenLevel:F0}%\n" +
+                   $"Крыс рядом: {nearbyRats}\n" +
                    $"Контроль: {(controlMalfunctionTimer > 0 ? $"{(maxControlMalfunctionTime - controlMalfunctionTimer):F0}с" : "ОК")}\n" +
                    $"Батарея: {(batteryEmptyTimer > 0 ? $"⚠️ {batteryEmptyTimer:F0}с" : "ОК")}";
         }
@@ -406,9 +680,26 @@ namespace BNG
             batteryEmptyTimer = 0f;
             isOxygenCritical = false;
             isGameOver = false;
+            wasLowHealth = false;
+            ratBiteCooldowns.Clear();
         }
         
-        // Для тестирования в редакторе
+        /// <summary>
+        /// Нанести урон игроку извне (например, от других источников)
+        /// </summary>
+        public void DamagePlayer(float damage, bool showEffects = true)
+        {
+            playerHealth -= damage;
+            playerHealth = Mathf.Clamp(playerHealth, 0f, maxPlayerHealth);
+            
+            if (showEffects)
+            {
+                PlayBiteEffects();
+            }
+            
+            OnPlayerHealthChanged?.Invoke(playerHealth);
+        }
+        
         [ContextMenu("Debug: Trigger Hull Breach")]
         public void DebugTriggerHullBreach()
         {
@@ -425,6 +716,13 @@ namespace BNG
         public void DebugTriggerOxygenCritical()
         {
             oxygenLevel = 5f;
+        }
+        
+        [ContextMenu("Debug: Simulate Rat Bite")]
+        public void DebugSimulateBite()
+        {
+            DamagePlayer(ratBiteDamage);
+            OnRatBite?.Invoke(ratBiteDamage);
         }
         
         #endregion
