@@ -114,24 +114,6 @@ namespace BNG
             statusText.text = status;
         }
         
-        // Методы для кнопок UI (опционально)
-        public void TestHullBreach()
-        {
-            if (gameOverManager != null)
-                gameOverManager.DebugTriggerHullBreach();
-        }
-        
-        public void TestLowHealth()
-        {
-            if (gameOverManager != null)
-                gameOverManager.DebugTriggerLowHealth();
-        }
-        
-        public void TestOxygenCritical()
-        {
-            if (gameOverManager != null)
-                gameOverManager.DebugTriggerOxygenCritical();
-        }
         
         public void ResetAllSystems()
         {

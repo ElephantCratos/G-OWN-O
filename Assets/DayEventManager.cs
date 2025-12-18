@@ -17,23 +17,31 @@ public class DayEventManager : MonoBehaviour
     
     [Header("Day Management")]
     public int currentDay = 1;
+    public int maxDays = 7; // Максимальное количество дней
     public List<DayEvent> todayEvents = new List<DayEvent>();
     
     [Header("Event Spawners")]
     public RatSpawner ratSpawner;
-    public HoleSpawner holeSpawner; // Добавили spawner пробоин
+    public HoleSpawner holeSpawner;
     public ControlPanelMalfunction controlPanelMalfunction;
-
     public BatteryReplacementEvent batteryReplacementEvent;
-
     public PinReplacementTask pinReplacementTask;
     
     [Header("Events")]
     public UnityEvent OnDayComplete;
     public UnityEvent<int> OnNewDayStarted;
+    public UnityEvent OnGameWon; // НОВОЕ: Событие победы
+    
+    private bool isGameWon = false;
     
     public bool AreAllEventsCompleted()
     {
+        // НОВОЕ: В первый день нет событий, поэтому день всегда завершён
+        if (currentDay == 1)
+        {
+            return true;
+        }
+        
         foreach (var dayEvent in todayEvents)
         {
             if (!dayEvent.isCompleted)
@@ -68,11 +76,18 @@ public class DayEventManager : MonoBehaviour
     
     public void StartNewDay()
     {
+        // Проверка на победу ПЕРЕД началом нового дня
+        if (currentDay >= maxDays)
+        {
+            TriggerVictory();
+            return;
+        }
+        
         if (controlPanelMalfunction != null)
-        controlPanelMalfunction.EndMalfunctionEvent();
+            controlPanelMalfunction.EndMalfunctionEvent();
     
         if (batteryReplacementEvent != null)
-        batteryReplacementEvent.ResetEvent();
+            batteryReplacementEvent.ResetEvent();
     
         currentDay++;
         
@@ -81,17 +96,65 @@ public class DayEventManager : MonoBehaviour
         
         OnNewDayStarted?.Invoke(currentDay);
         
-        Debug.Log($"Начался день {currentDay}");
+        Debug.Log($"═══════════════════════════");
+        Debug.Log($"   НАЧАЛСЯ ДЕНЬ {currentDay}");
+        Debug.Log($"═══════════════════════════");
         
-        // Генерируем новые ивенты для нового дня
-        GenerateDayEvents();
-        
-        // Запускаем все ивенты
-        StartAllEvents();
+        // НОВОЕ: В первый день не генерируем события
+        if (currentDay == 1)
+        {
+            Debug.Log("🎓 ОБУЧАЮЩИЙ ДЕНЬ - Без заданий");
+            Debug.Log("Осмотритесь, изучите управление и отправляйтесь на зарядку!");
+        }
+        else
+        {
+            // Генерируем новые ивенты для нового дня
+            GenerateDayEvents();
+            
+            // Запускаем все ивенты
+            StartAllEvents();
+        }
     }
     
-     private void GenerateDayEvents()
+    private void TriggerVictory()
     {
+        if (isGameWon) return;
+        
+        isGameWon = true;
+        
+        Debug.Log($"═══════════════════════════");
+        Debug.Log($"       🏆 ПОБЕДА! 🏆");
+        Debug.Log($"═══════════════════════════");
+        Debug.Log($"Вы продержались {maxDays} дней!");
+        Debug.Log($"Поздравляем с успешным завершением миссии!");
+        Debug.Log($"═══════════════════════════");
+        
+        OnGameWon?.Invoke();
+        
+        // Останавливаем все системы
+        StopAllSystems();
+    }
+    
+    private void StopAllSystems()
+    {
+        if (ratSpawner != null)
+            ratSpawner.StopSpawning();
+        
+        if (holeSpawner != null)
+            holeSpawner.StopHoleEvent();
+        
+        if (controlPanelMalfunction != null)
+            controlPanelMalfunction.ForceStopMalfunction();
+    }
+    
+    private void GenerateDayEvents()
+    {
+        // НОВОЕ: В первый день не генерируем события
+        if (currentDay == 1)
+        {
+            return;
+        }
+        
         // 50% шанс ивента с крысами
         if (Random.value > 0.5f && ratSpawner != null)
         {
@@ -114,7 +177,7 @@ public class DayEventManager : MonoBehaviour
             todayEvents.Add(holeEvent);
         }
         
-        // === ДОБАВЛЕНО: 40% шанс ивента с поломкой панели управления ===
+        // 40% шанс ивента с поломкой панели управления
         if (Random.value > 0.6f && controlPanelMalfunction != null)
         {
             DayEvent controlEvent = new DayEvent
@@ -125,6 +188,7 @@ public class DayEventManager : MonoBehaviour
             todayEvents.Add(controlEvent);
         }
 
+        // 40% шанс ивента с заменой пинов
         if (Random.value > 0.6f && pinReplacementTask != null)
         {
             DayEvent pinEvent = new DayEvent
@@ -138,8 +202,7 @@ public class DayEventManager : MonoBehaviour
         // Если не выпало ни одного ивента, добавим хотя бы один
         if (todayEvents.Count == 0)
         {
-            // Случайно выбираем какой ивент добавить
-            int randomEvent = Random.Range(0, 3);
+            int randomEvent = Random.Range(0, 4);
             
             if (randomEvent == 0 && ratSpawner != null)
             {
@@ -149,7 +212,7 @@ public class DayEventManager : MonoBehaviour
             {
                 todayEvents.Add(new DayEvent { eventName = "PatchHoles" });
             }
-            else if (controlPanelMalfunction != null)
+            else if (randomEvent == 2 && controlPanelMalfunction != null)
             {
                 todayEvents.Add(new DayEvent { eventName = "FixControls" });
             }
@@ -184,7 +247,6 @@ public class DayEventManager : MonoBehaviour
                     }
                     break;
                 
-                // === ДОБАВЛЕНО ===
                 case "FixControls":
                     if (controlPanelMalfunction != null)
                     {
@@ -192,6 +254,7 @@ public class DayEventManager : MonoBehaviour
                         Debug.Log("Запущен ивент: FixControls - Авария систем!");
                     }
                     break;
+                    
                 case "ReplacePins":
                     if (pinReplacementTask != null)
                     {
@@ -205,65 +268,75 @@ public class DayEventManager : MonoBehaviour
         }
     }
     
-    // Метод для проверки состояния ивентов (для UI)
     public string GetDayProgress()
     {
+        // НОВОЕ: Специальное сообщение для первого дня
+        if (currentDay == 1)
+        {
+            return $"День {currentDay}/{maxDays}: 🎓 Обучающий день";
+        }
+        
         int completed = 0;
         foreach (var dayEvent in todayEvents)
         {
             if (dayEvent.isCompleted) completed++;
         }
         
-        return $"День {currentDay}: {completed}/{todayEvents.Count} задач выполнено";
+        return $"День {currentDay}/{maxDays}: {completed}/{todayEvents.Count} задач выполнено";
     }
 
     public void UncompleteEvent(string eventName)
-{
-    foreach (var dayEvent in todayEvents)
     {
-        if (dayEvent.eventName == eventName && dayEvent.isCompleted)
+        foreach (var dayEvent in todayEvents)
         {
-            dayEvent.isCompleted = false;
-            
-            Debug.Log($"Ивент '{eventName}' снова активен — параметры сбились!");
-            break;
+            if (dayEvent.eventName == eventName && dayEvent.isCompleted)
+            {
+                dayEvent.isCompleted = false;
+                
+                Debug.Log($"Ивент '{eventName}' снова активен — параметры сбились!");
+                break;
+            }
         }
     }
-}
-public void AddEvent(string eventName)
-{
-    // === ДЕБАГ: кто вызывает? ===
-    Debug.Log($"[DayEventManager] AddEvent('{eventName}') вызван из:\n{System.Environment.StackTrace}");
     
-    foreach (var existing in todayEvents)
+    public void AddEvent(string eventName)
     {
-        if (existing.eventName == eventName)
+        Debug.Log($"[DayEventManager] AddEvent('{eventName}') вызван из:\n{System.Environment.StackTrace}");
+        
+        // НОВОЕ: Не добавляем события в первый день
+        if (currentDay == 1)
         {
-            Debug.Log($"Ивент '{eventName}' уже существует");
+            Debug.Log($"⚠️ Попытка добавить событие '{eventName}' в обучающий день - игнорируется");
             return;
         }
+        
+        foreach (var existing in todayEvents)
+        {
+            if (existing.eventName == eventName)
+            {
+                Debug.Log($"Ивент '{eventName}' уже существует");
+                return;
+            }
+        }
+        
+        DayEvent newEvent = new DayEvent
+        {
+            eventName = eventName,
+            isCompleted = false
+        };
+        
+        todayEvents.Add(newEvent);
+        
+        Debug.Log($"Добавлен динамический ивент: {eventName}");
+    }
+
+    public void RemoveEvent(string eventName)
+    {
+        todayEvents.RemoveAll(e => e.eventName == eventName);
+        Debug.Log($"Ивент '{eventName}' удалён");
     }
     
-    DayEvent newEvent = new DayEvent
-    {
-        eventName = eventName,
-        isCompleted = false
-    };
-    
-    todayEvents.Add(newEvent);
-    
-    Debug.Log($"Добавлен динамический ивент: {eventName}");
-}
-
-/// <summary>
-/// Удаляет ивент из списка (если нужно полностью убрать)
-/// </summary>
-public void RemoveEvent(string eventName)
-{
-    todayEvents.RemoveAll(e => e.eventName == eventName);
-    Debug.Log($"Ивент '{eventName}' удалён");
-}
-public bool IsPinReplacementActive()
+    public bool IsPinReplacementActive()
     {
         foreach (var dayEvent in todayEvents)
         {
@@ -273,5 +346,17 @@ public bool IsPinReplacementActive()
             }
         }
         return false;
+    }
+    
+    // НОВОЕ: Проверка на победу
+    public bool IsGameWon()
+    {
+        return isGameWon;
+    }
+    
+    // НОВОЕ: Проверка на первый день
+    public bool IsFirstDay()
+    {
+        return currentDay == 1;
     }
 }

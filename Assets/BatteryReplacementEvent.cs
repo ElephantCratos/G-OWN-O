@@ -23,8 +23,6 @@ namespace BNG {
         
         private bool isEventActive = false;
         private bool isCompleted = false;
-        
-        // === НОВОЕ: отслеживаем, была ли батарейка вставлена хоть раз ===
         private bool hadBatteryBefore = false;
         
         private const string EVENT_NAME = "ReplaceBattery";
@@ -36,7 +34,6 @@ namespace BNG {
                 mainPowerSocket.OnBatteryInserted.AddListener(OnBatteryInserted);
                 mainPowerSocket.OnBatteryRemoved.AddListener(OnBatteryRemoved);
                 
-                // Если при старте батарейка уже в слоте — запоминаем
                 if (mainPowerSocket.CurrentBattery != null)
                 {
                     hadBatteryBefore = true;
@@ -55,20 +52,23 @@ namespace BNG {
         
         private void Update()
         {
+            // НОВОЕ: В первый день батарея не разряжается и события не активируются
+            if (dayEventManager != null && dayEventManager.IsFirstDay())
+            {
+                // Просто пропускаем всю логику
+                return;
+            }
+            
             if (mainPowerSocket == null) return;
             
             Battery currentBattery = mainPowerSocket.CurrentBattery;
             
             // === Проверка активации ивента ===
             
-            // Батарейка есть и села — активируем ивент
             if (!isEventActive && currentBattery != null && currentBattery.CurrentCharge <= criticalChargeLevel)
             {
                 StartBatteryEvent("Батарея разряжена!");
             }
-            
-            // Батарейки нет, НО она была раньше — значит извлекли/потеряли
-            // (этот кейс теперь обрабатывается в OnBatteryRemoved)
             
             // === Проверка завершения/отмены ===
             
@@ -89,10 +89,15 @@ namespace BNG {
         
         private void OnBatteryInserted(Battery battery)
         {
-            // Теперь мы знаем что батарейка была
             hadBatteryBefore = true;
             
             Debug.Log($"Батарея вставлена. Заряд: {battery.CurrentCharge:F0}%");
+            
+            // НОВОЕ: В первый день не активируем события
+            if (dayEventManager != null && dayEventManager.IsFirstDay())
+            {
+                return;
+            }
             
             if (isEventActive && battery.CurrentCharge >= minChargeToComplete)
             {
@@ -104,12 +109,16 @@ namespace BNG {
         {
             Debug.Log("Батарея извлечена!");
             
-            // Если ивент был завершён — отменяем
+            // НОВОЕ: В первый день не активируем события
+            if (dayEventManager != null && dayEventManager.IsFirstDay())
+            {
+                return;
+            }
+            
             if (isEventActive && isCompleted)
             {
                 UncompleteBatteryEvent();
             }
-            // Если ивента не было, но батарейка была — запускаем
             else if (!isEventActive && hadBatteryBefore)
             {
                 StartBatteryEvent("Батарея извлечена!");
@@ -118,6 +127,13 @@ namespace BNG {
         
         private void StartBatteryEvent(string reason)
         {
+            // НОВОЕ: Дополнительная проверка на первый день
+            if (dayEventManager != null && dayEventManager.IsFirstDay())
+            {
+                Debug.Log("⏸️ Батарея защищена в обучающий день");
+                return;
+            }
+            
             isEventActive = true;
             isCompleted = false;
             
@@ -172,7 +188,6 @@ namespace BNG {
         {
             isEventActive = false;
             isCompleted = false;
-            // НЕ сбрасываем hadBatteryBefore — память о батарейке сохраняется
             
             if (warningLights != null) warningLights.SetActive(false);
             if (warningSound != null) warningSound.Stop();
@@ -199,6 +214,12 @@ namespace BNG {
         
         public string GetStatus()
         {
+            // НОВОЕ: Специальное сообщение для первого дня
+            if (dayEventManager != null && dayEventManager.IsFirstDay())
+            {
+                return "Питание: 🛡️ ЗАЩИЩЕНО (Обучение)";
+            }
+            
             if (!isEventActive) return "Питание: ОК";
             
             Battery battery = mainPowerSocket?.CurrentBattery;

@@ -8,7 +8,7 @@ namespace BNG
 {
     /// <summary>
     /// Управляет критериями поражения и состоянием корабля
-    /// ОБНОВЛЕНО: Интеграция с GameOverUI
+    /// ОБНОВЛЕНО: Блокировка игры после Game Over
     /// </summary>
     public class GameOverManager : MonoBehaviour
     {
@@ -37,7 +37,6 @@ namespace BNG
         [Tooltip("Ссылка на трансформ игрока")]
         public Transform playerTransform;
         
-        // Словарь для отслеживания кулдауна укусов каждой крысы
         private Dictionary<GameObject, float> ratBiteCooldowns = new Dictionary<GameObject, float>();
         
         [Header("Потеря управления")]
@@ -56,6 +55,16 @@ namespace BNG
         public float criticalOxygenLevel = 0f;
         private bool isOxygenCritical = false;
         
+        [Header("=== БЛОКИРОВКА ПОСЛЕ GAME OVER ===")]
+        [Tooltip("Отключать ли взаимодействие с объектами после поражения")]
+        public bool disableInteractionOnGameOver = true;
+        [Tooltip("Список Grabber'ов для отключения")]
+        public List<Grabber> playerGrabbers = new List<Grabber>();
+        [Tooltip("Locomotion для отключения движения")]
+        public SmoothLocomotion playerLocomotion;
+        [Tooltip("Teleport для отключения телепортации")]
+        public PlayerTeleport playerTeleport;
+        
         [Header("=== ССЫЛКИ НА КОМПОНЕНТЫ ===")]
         public HoleSpawner holeSpawner;
         public RatSpawner ratSpawner;
@@ -69,7 +78,7 @@ namespace BNG
         public UnityEvent<float> OnHullIntegrityChanged;
         public UnityEvent<float> OnPlayerHealthChanged;
         public UnityEvent<float> OnOxygenLevelChanged;
-        public UnityEvent<string> OnGameOver; // ⬅️ ИСПОЛЬЗУЕТСЯ GAMEOVERUI
+        public UnityEvent<string> OnGameOver;
         public UnityEvent OnCriticalWarning;
         
         [Header("Визуальные эффекты")]
@@ -78,43 +87,29 @@ namespace BNG
         public GameObject criticalOxygenEffects;
         
         [Header("Настройки Game Over")]
-        public bool useGameOverUI = true; // ⬅️ НОВОЕ: Использовать UI вместо прямой загрузки сцены
+        public bool useGameOverUI = true;
         public string gameOverSceneName = "MainMenu";
         public float gameOverDelay = 3f;
         
         [Header("События укусов и индикаторов")]
-        [Tooltip("Вызывается при каждом укусе крысы (передаёт урон)")]
         public UnityEvent<float> OnRatBite;
-        [Tooltip("Вызывается при критическом здоровье (<30%)")]
         public UnityEvent OnLowHealthWarning;
-        [Tooltip("Вызывается когда здоровье восстановилось")]
         public UnityEvent OnHealthRestored;
-        [Tooltip("Вызывается при критической герметичности")]
         public UnityEvent OnHullBreachWarning;
-        [Tooltip("Вызывается при проблемах с кислородом")]
         public UnityEvent OnOxygenWarning;
-        [Tooltip("Вызывается при проблемах с управлением")]
         public UnityEvent OnControlWarning;
         
         [Header("Эффекты укуса")]
-        [Tooltip("Красная виньетка при укусе")]
         public GameObject biteDamageVignette;
-        [Tooltip("Длительность эффекта укуса")]
         public float biteEffectDuration = 0.3f;
-        [Tooltip("Аудио укуса")]
         public AudioSource biteAudioSource;
         public AudioClip[] biteAudioClips;
         
         [Header("Индикаторы проблем (UI)")]
-        [Tooltip("Иконка проблемы с герметичностью")]
         public GameObject hullWarningIndicator;
-        [Tooltip("Иконка проблемы со здоровьем")]
         public GameObject healthWarningIndicator;
-        [Tooltip("Иконка проблемы с кислородом")]
         public GameObject oxygenWarningIndicator;
-        [Tooltip("Иконка проблемы с управлением")]
         public GameObject controlWarningIndicator;
-        [Tooltip("Иконка проблемы с батареей")]
         public GameObject batteryWarningIndicator;
         
         [Header("Вибрация контроллера (VR)")]
@@ -129,7 +124,6 @@ namespace BNG
         
         void Start()
         {
-            // Автопоиск игрока если не назначен
             if (playerTransform == null)
             {
                 GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -137,14 +131,30 @@ namespace BNG
                     playerTransform = player.transform;
                 else
                 {
-                    // Пробуем найти камеру VR
                     Camera mainCam = Camera.main;
                     if (mainCam != null)
                         playerTransform = mainCam.transform;
                 }
             }
             
-            // Скрываем все индикаторы на старте
+            // НОВОЕ: Автопоиск компонентов для блокировки
+            if (playerGrabbers.Count == 0)
+            {
+                Grabber[] foundGrabbers = FindObjectsOfType<Grabber>();
+                playerGrabbers.AddRange(foundGrabbers);
+                Debug.Log($"Найдено Grabber'ов: {playerGrabbers.Count}");
+            }
+            
+            if (playerLocomotion == null)
+            {
+                playerLocomotion = FindObjectOfType<SmoothLocomotion>();
+            }
+            
+            if (playerTeleport == null)
+            {
+                playerTeleport = FindObjectOfType<PlayerTeleport>();
+            }
+            
             SetIndicatorActive(hullWarningIndicator, false);
             SetIndicatorActive(healthWarningIndicator, false);
             SetIndicatorActive(oxygenWarningIndicator, false);
@@ -155,6 +165,12 @@ namespace BNG
         
         void Update()
         {
+            // НОВОЕ: Проверяем победу - если игра выиграна, не проверяем Game Over
+            if (dayEventManager != null && dayEventManager.IsGameWon())
+            {
+                return;
+            }
+            
             if (isGameOver) return;
             
             UpdateHullIntegrity();
@@ -186,7 +202,6 @@ namespace BNG
                 criticalHullEffects.SetActive(hullIntegrity < 40f);
             }
             
-            // Предупреждение при критической герметичности
             if (hullIntegrity < 40f && hullIntegrity >= criticalIntegrityLevel)
             {
                 OnHullBreachWarning?.Invoke();
@@ -195,18 +210,16 @@ namespace BNG
         
         #endregion
         
-        #region Player Health System (с системой укусов)
+        #region Player Health System
         
         void UpdatePlayerHealth()
         {
             if (ratSpawner == null || playerTransform == null)
             {
-                // Если нет спавнера или игрока, просто регенерируем
                 RegenerateHealth();
                 return;
             }
             
-            // Получаем список живых крыс
             List<GameObject> aliveRats = ratSpawner.GetAliveRats();
             
             if (aliveRats == null || aliveRats.Count == 0)
@@ -216,7 +229,6 @@ namespace BNG
                 return;
             }
             
-            // Очищаем мёртвых крыс из словаря кулдаунов
             CleanupRatCooldowns();
             
             int bitesThisFrame = 0;
@@ -226,12 +238,10 @@ namespace BNG
                 if (rat == null) continue;
                 if (bitesThisFrame >= maxSimultaneousBites) break;
                 
-                // Проверяем расстояние до игрока
                 float distance = Vector3.Distance(rat.transform.position, playerTransform.position);
                 
                 if (distance <= ratAttackRange)
                 {
-                    // Крыса в радиусе атаки — проверяем кулдаун
                     if (CanRatBite(rat))
                     {
                         PerformRatBite(rat);
@@ -240,10 +250,8 @@ namespace BNG
                 }
             }
             
-            // Обновляем кулдауны
             UpdateRatCooldowns();
             
-            // Если крыс рядом нет — регенерация
             if (bitesThisFrame == 0 && !IsAnyRatNearby(aliveRats))
             {
                 RegenerateHealth();
@@ -252,10 +260,8 @@ namespace BNG
             playerHealth = Mathf.Clamp(playerHealth, 0f, maxPlayerHealth);
             OnPlayerHealthChanged?.Invoke(playerHealth);
             
-            // Проверяем состояние здоровья для событий
             CheckHealthState();
             
-            // Визуальные эффекты при низком здоровье
             if (criticalHealthEffects != null)
             {
                 criticalHealthEffects.SetActive(playerHealth < 30f);
@@ -268,7 +274,7 @@ namespace BNG
             {
                 if (rat == null) continue;
                 float distance = Vector3.Distance(rat.transform.position, playerTransform.position);
-                if (distance <= ratAttackRange * 1.5f) // Небольшой буфер
+                if (distance <= ratAttackRange * 1.5f)
                     return true;
             }
             return false;
@@ -287,19 +293,11 @@ namespace BNG
         
         void PerformRatBite(GameObject rat)
         {
-            // Наносим урон
             playerHealth -= ratBiteDamage;
-            
-            // Устанавливаем кулдаун для этой крысы
             ratBiteCooldowns[rat] = biteCooldown;
-            
-            // Вызываем событие укуса
             OnRatBite?.Invoke(ratBiteDamage);
-            
-            // Визуальные и звуковые эффекты
             PlayBiteEffects();
             
-            // Вибрация контроллера
             if (enableControllerVibration)
             {
                 TriggerControllerVibration();
@@ -310,7 +308,6 @@ namespace BNG
         
         void PlayBiteEffects()
         {
-            // Красная виньетка
             if (biteDamageVignette != null)
             {
                 if (biteEffectCoroutine != null)
@@ -318,7 +315,6 @@ namespace BNG
                 biteEffectCoroutine = StartCoroutine(ShowBiteVignette());
             }
             
-            // Звук укуса
             if (biteAudioSource != null && biteAudioClips != null && biteAudioClips.Length > 0)
             {
                 AudioClip clip = biteAudioClips[Random.Range(0, biteAudioClips.Length)];
@@ -335,7 +331,6 @@ namespace BNG
         
         void TriggerControllerVibration()
         {
-            // Для BNG Framework
             if (InputBridge.Instance != null)
             {
                 InputBridge.Instance.VibrateController(biteVibrationIntensity, biteVibrationIntensity, 
@@ -464,7 +459,7 @@ namespace BNG
         
         #endregion
         
-        #region Oxygen System (Pins)
+        #region Oxygen System
         
         void UpdateOxygenSystem()
         {
@@ -538,19 +533,10 @@ namespace BNG
         
         void UpdateWarningIndicators()
         {
-            // Индикатор герметичности
             SetIndicatorActive(hullWarningIndicator, hullIntegrity < 50f);
-            
-            // Индикатор здоровья
             SetIndicatorActive(healthWarningIndicator, playerHealth < 50f);
-            
-            // Индикатор кислорода
             SetIndicatorActive(oxygenWarningIndicator, oxygenLevel < 50f || isOxygenCritical);
-            
-            // Индикатор управления
             SetIndicatorActive(controlWarningIndicator, controlMalfunctionTimer > 0f);
-            
-            // Индикатор батареи
             SetIndicatorActive(batteryWarningIndicator, batteryEmptyTimer > 0f);
         }
         
@@ -606,16 +592,49 @@ namespace BNG
             Debug.Log($"День: {dayEventManager?.currentDay ?? 0}");
             Debug.Log($"═══════════════════════════");
             
-            // ⬅️ ИЗМЕНЕННОЕ: Вызываем OnGameOver для UI
             OnGameOver?.Invoke(reason);
             
             StopAllSystems();
             
-            // ⬅️ НОВОЕ: Только если не используем UI, загружаем сцену напрямую
+            // НОВОЕ: Блокируем взаимодействие
+            if (disableInteractionOnGameOver)
+            {
+                DisablePlayerInteraction();
+            }
+            
             if (!useGameOverUI)
             {
                 StartCoroutine(GameOverSequence(reason));
             }
+        }
+        
+        // НОВОЕ: Метод блокировки взаимодействия
+        void DisablePlayerInteraction()
+        {
+            Debug.Log("🔒 Блокировка взаимодействия игрока...");
+            
+            // Отключаем Grabber'ы
+            foreach (Grabber grabber in playerGrabbers)
+            {
+                if (grabber != null)
+                {
+                    grabber.enabled = false;
+                }
+            }
+            
+            // Отключаем передвижение
+            if (playerLocomotion != null)
+            {
+                playerLocomotion.enabled = false;
+            }
+            
+            // Отключаем телепортацию
+            if (playerTeleport != null)
+            {
+                playerTeleport.enabled = false;
+            }
+            
+            Debug.Log($"✓ Отключено: {playerGrabbers.Count} Grabber'ов, Locomotion, Teleport");
         }
         
         void StopAllSystems()
@@ -648,9 +667,6 @@ namespace BNG
         
         #region Public Methods
         
-        /// <summary>
-        /// Получить количество крыс рядом с игроком
-        /// </summary>
         public int GetNearbyRatsCount()
         {
             if (ratSpawner == null || playerTransform == null) return 0;
@@ -692,9 +708,6 @@ namespace BNG
             ratBiteCooldowns.Clear();
         }
         
-        /// <summary>
-        /// Нанести урон игроку извне (например, от других источников)
-        /// </summary>
         public void DamagePlayer(float damage, bool showEffects = true)
         {
             playerHealth -= damage;
@@ -708,30 +721,7 @@ namespace BNG
             OnPlayerHealthChanged?.Invoke(playerHealth);
         }
         
-        [ContextMenu("Debug: Trigger Hull Breach")]
-        public void DebugTriggerHullBreach()
-        {
-            hullIntegrity = 15f;
-        }
-        
-        [ContextMenu("Debug: Trigger Low Health")]
-        public void DebugTriggerLowHealth()
-        {
-            playerHealth = 5f;
-        }
-        
-        [ContextMenu("Debug: Trigger Oxygen Critical")]
-        public void DebugTriggerOxygenCritical()
-        {
-            oxygenLevel = 5f;
-        }
-        
-        [ContextMenu("Debug: Simulate Rat Bite")]
-        public void DebugSimulateBite()
-        {
-            DamagePlayer(ratBiteDamage);
-            OnRatBite?.Invoke(ratBiteDamage);
-        }
+        public bool IsGameOver() => isGameOver;
         
         #endregion
     }
