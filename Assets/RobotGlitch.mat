@@ -61,13 +61,13 @@ Material:
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _GlitchIntensity: 0.9589871
+    - _GlitchIntensity: 0.7761215
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
     - _Metallic: 0
     - _Mode: 0
-    - _NoiseIntensity: 0.7642145
+    - _NoiseIntensity: 0.4198587
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _ScanlineIntensity: 0.097

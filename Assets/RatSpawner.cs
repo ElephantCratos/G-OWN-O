@@ -27,6 +27,11 @@ public class RatSpawner : MonoBehaviour
     private List<GameObject> spawnedRats = new List<GameObject>();
     private bool isSpawning = false;
 
+    [Header("Audio")]
+    public AudioSource audioSource;
+    public AudioClip spawnStartSound;
+
+
     void Update()
     {
         if (!isSpawning) return;
@@ -47,6 +52,12 @@ public class RatSpawner : MonoBehaviour
         isSpawning = true;
         killedRats = 0;
         timer = 0f; // Спавним сразу
+
+        if (audioSource != null && spawnStartSound != null)
+        {
+        audioSource.PlayOneShot(spawnStartSound);
+        }
+
         Debug.Log("Начался спавн крыс!");
     }
 
