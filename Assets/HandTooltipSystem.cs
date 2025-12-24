@@ -27,8 +27,12 @@ namespace VRTooltips
         [SerializeField] private float maxDistance = 10f;
         [SerializeField] private LayerMask tooltipTargetLayer;
         
-        [Header("Toggle Button")]
+        [Header("Toggle Settings")]
         [SerializeField] private ControllerHand controllerHand = ControllerHand.Right;
+        [Tooltip("Разрешить переключение кнопкой на контроллере")]
+        [SerializeField] private bool allowControllerToggle = true;
+        [Tooltip("Загружать настройку из PlayerPrefs при старте")]
+        [SerializeField] private bool loadFromPlayerPrefs = true;
         
         [Header("Debug")]
         [SerializeField] private bool showDebugLogs = true;
@@ -40,13 +44,61 @@ namespace VRTooltips
         private TextMeshProUGUI descriptionText;
         
         private TooltipData currentTarget;
-        private bool tooltipsEnabled = true;
         private bool buttonWasPressed = false;
         private bool isShowing = false;
         
         private InputBridge input;
         
         private Vector3 canvasTargetScale;
+        
+        // === СТАТИЧЕСКИЙ ДОСТУП ===
+        private static HandTooltipSystem instance;
+        private static bool _tooltipsEnabled = true;
+        
+        private const string TOOLTIPS_PREF_KEY = "TooltipsEnabled";
+        
+        /// <summary>
+        /// Глобальное состояние тултипов (для доступа из меню)
+        /// </summary>
+        public static bool TooltipsEnabled
+        {
+            get => _tooltipsEnabled;
+            set
+            {
+                if (_tooltipsEnabled != value)
+                {
+                    _tooltipsEnabled = value;
+                    PlayerPrefs.SetInt(TOOLTIPS_PREF_KEY, value ? 1 : 0);
+                    PlayerPrefs.Save();
+                    
+                    // Уведомляем инстанс
+                    if (instance != null)
+                    {
+                        instance.OnTooltipsStateChanged(value);
+                    }
+                    
+                    Debug.Log($"[HandTooltip] Tooltips globally set to: {(value ? "ON" : "OFF")}");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Получить текущий инстанс системы
+        /// </summary>
+        public static HandTooltipSystem Instance => instance;
+
+        void Awake()
+        {
+            // Singleton-подобное поведение (но без DontDestroyOnLoad)
+            if (instance == null)
+            {
+                instance = this;
+            }
+            else if (instance != this)
+            {
+                Debug.LogWarning("[HandTooltip] Multiple instances detected! Using the first one.");
+            }
+        }
 
         void Start()
         {
@@ -61,6 +113,13 @@ namespace VRTooltips
                 DebugLog("ERROR: Hand Anchor not assigned!", true);
             
             canvasTargetScale = Vector3.one * worldScale;
+            
+            // Загружаем сохранённую настройку
+            if (loadFromPlayerPrefs)
+            {
+                _tooltipsEnabled = PlayerPrefs.GetInt(TOOLTIPS_PREF_KEY, 1) == 1;
+                DebugLog($"Loaded tooltips setting: {(_tooltipsEnabled ? "ON" : "OFF")}");
+            }
             
             CreateTooltipFromScratch();
             
@@ -178,12 +237,21 @@ namespace VRTooltips
 
         void Update()
         {
-            HandleToggleButton();
+            // Переключение кнопкой контроллера
+            if (allowControllerToggle)
+            {
+                HandleToggleButton();
+            }
             
-            if (tooltipsEnabled)
+            // Основная логика
+            if (_tooltipsEnabled)
+            {
                 DetectTooltipTarget();
+            }
             else
+            {
                 HideTooltip();
+            }
             
             UpdateTooltipRotation();
             UpdateTooltipVisibility();
@@ -214,11 +282,24 @@ namespace VRTooltips
             
             if (buttonPressed && !buttonWasPressed)
             {
-                tooltipsEnabled = !tooltipsEnabled;
-                DebugLog($"Tooltips toggled: {(tooltipsEnabled ? "ON" : "OFF")}");
+                // Используем статическое свойство для синхронизации с меню
+                TooltipsEnabled = !TooltipsEnabled;
             }
             
             buttonWasPressed = buttonPressed;
+        }
+        
+        /// <summary>
+        /// Вызывается при изменении состояния тултипов (из меню или кнопкой)
+        /// </summary>
+        private void OnTooltipsStateChanged(bool enabled)
+        {
+            DebugLog($"Tooltips state changed to: {(enabled ? "ON" : "OFF")}");
+            
+            if (!enabled)
+            {
+                HideTooltip();
+            }
         }
         
         private void DetectTooltipTarget()
@@ -273,21 +354,22 @@ namespace VRTooltips
             currentTarget = null;
         }
         
-       private void UpdateTooltipRotation()
-{
-    if (tooltipRoot == null || headTransform == null) return;
-    
-    Vector3 dirToHead = headTransform.position - tooltipRoot.transform.position;
-    dirToHead.y = 0;
-    
-    if (dirToHead.sqrMagnitude > 0.001f)
-    {
-        // Разворачиваем на 180° чтобы текст был лицом к игроку
-        Quaternion lookRot = Quaternion.LookRotation(dirToHead);
-        Quaternion flip = Quaternion.Euler(0, 180, 0);
-        tooltipRoot.transform.rotation = lookRot * flip;
-    }
-}
+        private void UpdateTooltipRotation()
+        {
+            if (tooltipRoot == null || headTransform == null) return;
+            
+            Vector3 dirToHead = headTransform.position - tooltipRoot.transform.position;
+            dirToHead.y = 0;
+            
+            if (dirToHead.sqrMagnitude > 0.001f)
+            {
+                // Разворачиваем на 180° чтобы текст был лицом к игроку
+                Quaternion lookRot = Quaternion.LookRotation(dirToHead);
+                Quaternion flip = Quaternion.Euler(0, 180, 0);
+                tooltipRoot.transform.rotation = lookRot * flip;
+            }
+        }
+        
         private void UpdateTooltipVisibility()
         {
             if (canvasGroup == null) return;
@@ -306,8 +388,49 @@ namespace VRTooltips
                 Debug.Log($"[HandTooltip] {message}");
         }
         
+        #region Public API
+        
+        /// <summary>
+        /// Включить тултипы
+        /// </summary>
+        public void EnableTooltips()
+        {
+            TooltipsEnabled = true;
+        }
+        
+        /// <summary>
+        /// Выключить тултипы
+        /// </summary>
+        public void DisableTooltips()
+        {
+            TooltipsEnabled = false;
+        }
+        
+        /// <summary>
+        /// Переключить состояние тултипов
+        /// </summary>
+        public void ToggleTooltips()
+        {
+            TooltipsEnabled = !TooltipsEnabled;
+        }
+        
+        /// <summary>
+        /// Проверить, включены ли тултипы
+        /// </summary>
+        public bool AreTooltipsEnabled()
+        {
+            return TooltipsEnabled;
+        }
+        
+        #endregion
+        
         void OnDestroy()
         {
+            if (instance == this)
+            {
+                instance = null;
+            }
+            
             if (tooltipRoot != null)
                 Destroy(tooltipRoot);
         }
