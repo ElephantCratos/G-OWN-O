@@ -8,7 +8,7 @@ namespace BNG
 {
     /// <summary>
     /// Управляет критериями поражения и состоянием корабля
-    /// ОБНОВЛЕНО: Блокировка игры после Game Over + Звуковые предупреждения таймеров
+    /// ОБНОВЛЕНО: Полная система звуковых предупреждений для всех критических ситуаций
     /// </summary>
     public class GameOverManager : MonoBehaviour
     {
@@ -52,29 +52,95 @@ namespace BNG
         [Header("Критическая ситуация с пинами")]
         public float oxygenLevel = 100f;
         public float oxygenDepletionRate = 5f;
-        public float criticalOxygenLevel = 0f;
+        public float criticalOxygenLevel = 10f;
         private bool isOxygenCritical = false;
         
-        [Header("=== ЗВУКОВЫЕ ПРЕДУПРЕЖДЕНИЯ ТАЙМЕРОВ ===")]
+        [Header("=== ЗВУКОВЫЕ ПРЕДУПРЕЖДЕНИЯ ===")]
         [Tooltip("Источник звука для предупреждений")]
-        public AudioSource timerWarningAudioSource;
+        public AudioSource warningAudioSource;
         
+        [Header("Звуки предупреждений таймеров")]
         [Tooltip("Звук предупреждения за 30 секунд")]
         public AudioClip timer30SecWarning;
-        
         [Tooltip("Звук критического предупреждения (за 10 сек)")]
         public AudioClip timer10SecWarning;
-        
         [Tooltip("Звуковой сигнал каждые 5 секунд в критическое время")]
         public AudioClip timerBeepSound;
-        
         [Tooltip("Интервал сигналов в критическое время")]
         public float criticalBeepInterval = 5f;
         
-        // Флаги для отслеживания воспроизведенных предупреждений
+        [Header("Звуки кислородной системы (пины)")]
+        [Tooltip("Звук при вытаскивании всех пинов - начало кризиса")]
+        public AudioClip oxygenCrisisStartSound;
+        [Tooltip("Звук предупреждения при 50% кислорода")]
+        public AudioClip oxygen50PercentWarning;
+        [Tooltip("Звук критического уровня при 25% кислорода")]
+        public AudioClip oxygen25PercentWarning;
+        [Tooltip("Звук последнего шанса при 10% кислорода")]
+        public AudioClip oxygen10PercentWarning;
+        [Tooltip("Постоянный звук тревоги при критическом кислороде")]
+        public AudioClip oxygenAlarmLoop;
+        
+        [Header("Звуки батареи")]
+        [Tooltip("Звук при разрядке батареи - начало кризиса")]
+        public AudioClip batteryCrisisStartSound;
+        [Tooltip("Звук предупреждения при приближении к критическому времени")]
+        public AudioClip batteryWarningSound;
+        [Tooltip("Звук при каждой новой пробоине от разряженной батареи")]
+        public AudioClip batteryHoleSpawnSound;
+        
+        [Header("Звуки герметичности (Hull)")]
+        [Tooltip("Звук при падении герметичности до 50%")]
+        public AudioClip hull50PercentWarning;
+        [Tooltip("Звук при падении герметичности до 35%")]
+        public AudioClip hull35PercentWarning;
+        [Tooltip("Звук при падении герметичности до 25% - критический")]
+        public AudioClip hull25PercentWarning;
+        [Tooltip("Постоянная сирена при критической герметичности")]
+        public AudioClip hullAlarmLoop;
+        
+        [Header("Звуки здоровья игрока")]
+        [Tooltip("Звук при падении здоровья до 50%")]
+        public AudioClip health50PercentWarning;
+        [Tooltip("Звук при падении здоровья до 25%")]
+        public AudioClip health25PercentWarning;
+        [Tooltip("Звук сердцебиения при критическом здоровье")]
+        public AudioClip heartbeatSound;
+        
+        [Header("Настройки звуковых предупреждений")]
+        [Tooltip("Минимальный интервал между одинаковыми предупреждениями")]
+        public float warningCooldown = 10f;
+        [Tooltip("Громкость предупреждений")]
+        [Range(0f, 1f)]
+        public float warningVolume = 1f;
+        
+        // Флаги для отслеживания воспроизведенных предупреждений - Контроль
         private bool control30SecWarningPlayed = false;
         private bool control10SecWarningPlayed = false;
         private float controlLastBeepTime = 0f;
+        
+        // Флаги для кислорода
+        private bool oxygenCrisisStartPlayed = false;
+        private bool oxygen50WarningPlayed = false;
+        private bool oxygen25WarningPlayed = false;
+        private bool oxygen10WarningPlayed = false;
+        private float lastOxygenAlarmTime = 0f;
+        
+        // Флаги для батареи
+        private bool batteryCrisisStartPlayed = false;
+        private bool batteryWarningPlayed = false;
+        private float lastBatteryBeepTime = 0f;
+        
+        // Флаги для герметичности
+        private bool hull50WarningPlayed = false;
+        private bool hull35WarningPlayed = false;
+        private bool hull25WarningPlayed = false;
+        private float lastHullAlarmTime = 0f;
+        
+        // Флаги для здоровья
+        private bool health50WarningPlayed = false;
+        private bool health25WarningPlayed = false;
+        private float lastHeartbeatTime = 0f;
         
         [Header("=== БЛОКИРОВКА ПОСЛЕ GAME OVER ===")]
         [Tooltip("Отключать ли взаимодействие с объектами после поражения")]
@@ -102,7 +168,6 @@ namespace BNG
         public UnityEvent<string> OnGameOver;
         public UnityEvent OnCriticalWarning;
         
-        // НОВОЕ: События для таймеров
         public UnityEvent<float> OnControlTimerUpdate;
         public UnityEvent<float> OnBatteryTimerUpdate;
         
@@ -123,6 +188,7 @@ namespace BNG
         public UnityEvent OnHullBreachWarning;
         public UnityEvent OnOxygenWarning;
         public UnityEvent OnControlWarning;
+        public UnityEvent OnBatteryWarning;
         
         [Header("Эффекты укуса")]
         public GameObject biteDamageVignette;
@@ -146,6 +212,11 @@ namespace BNG
         private bool isGameOver = false;
         private bool wasLowHealth = false;
         private Coroutine biteEffectCoroutine;
+        
+        // Для отслеживания предыдущих значений
+        private float previousHullIntegrity = 100f;
+        private float previousOxygenLevel = 100f;
+        private float previousPlayerHealth = 100f;
         
         void Start()
         {
@@ -180,15 +251,15 @@ namespace BNG
                 playerTeleport = FindObjectOfType<PlayerTeleport>();
             }
             
-            // НОВОЕ: Автопоиск AudioSource если не назначен
-            if (timerWarningAudioSource == null)
+            // Автопоиск AudioSource если не назначен
+            if (warningAudioSource == null)
             {
-                timerWarningAudioSource = gameObject.GetComponent<AudioSource>();
-                if (timerWarningAudioSource == null)
+                warningAudioSource = gameObject.GetComponent<AudioSource>();
+                if (warningAudioSource == null)
                 {
-                    timerWarningAudioSource = gameObject.AddComponent<AudioSource>();
-                    timerWarningAudioSource.playOnAwake = false;
-                    timerWarningAudioSource.spatialBlend = 0f; // 2D звук
+                    warningAudioSource = gameObject.AddComponent<AudioSource>();
+                    warningAudioSource.playOnAwake = false;
+                    warningAudioSource.spatialBlend = 0f; // 2D звук
                 }
             }
             
@@ -198,6 +269,11 @@ namespace BNG
             SetIndicatorActive(controlWarningIndicator, false);
             SetIndicatorActive(batteryWarningIndicator, false);
             SetIndicatorActive(biteDamageVignette, false);
+            
+            // Инициализация предыдущих значений
+            previousHullIntegrity = hullIntegrity;
+            previousOxygenLevel = oxygenLevel;
+            previousPlayerHealth = playerHealth;
         }
         
         void Update()
@@ -216,6 +292,10 @@ namespace BNG
             UpdateBatteryEmergency();
             UpdateOxygenSystem();
             UpdateWarningIndicators();
+            
+            // Обновляем звуковые предупреждения
+            UpdateHullWarnings();
+            UpdateHealthWarnings();
             
             CheckGameOverConditions();
         }
@@ -243,6 +323,63 @@ namespace BNG
             {
                 OnHullBreachWarning?.Invoke();
             }
+        }
+        
+        void UpdateHullWarnings()
+        {
+            // Предупреждение при 50% герметичности
+            if (hullIntegrity <= 50f && previousHullIntegrity > 50f && !hull50WarningPlayed)
+            {
+                PlayWarningSound(hull50PercentWarning);
+                hull50WarningPlayed = true;
+                OnCriticalWarning?.Invoke();
+                OnHullBreachWarning?.Invoke();
+                Debug.LogWarning("⚠️ ВНИМАНИЕ: Герметичность упала до 50%!");
+            }
+            
+            // Предупреждение при 35% герметичности
+            if (hullIntegrity <= 35f && previousHullIntegrity > 35f && !hull35WarningPlayed)
+            {
+                PlayWarningSound(hull35PercentWarning);
+                hull35WarningPlayed = true;
+                OnCriticalWarning?.Invoke();
+                Debug.LogWarning("🚨 ОПАСНОСТЬ: Герметичность упала до 35%!");
+            }
+            
+            // Критическое предупреждение при 25% герметичности
+            if (hullIntegrity <= 25f && previousHullIntegrity > 25f && !hull25WarningPlayed)
+            {
+                PlayWarningSound(hull25PercentWarning);
+                hull25WarningPlayed = true;
+                OnCriticalWarning?.Invoke();
+                Debug.LogWarning("💀 КРИТИЧЕСКОЕ: Герметичность 25%! Скоро Game Over!");
+            }
+            
+            // Постоянная сирена при критической герметичности (< 30%)
+            if (hullIntegrity < 30f && hullAlarmLoop != null)
+            {
+                if (Time.time - lastHullAlarmTime >= criticalBeepInterval)
+                {
+                    PlayWarningSound(hullAlarmLoop);
+                    lastHullAlarmTime = Time.time;
+                }
+            }
+            
+            // Сброс флагов при восстановлении
+            if (hullIntegrity > 55f)
+            {
+                hull50WarningPlayed = false;
+            }
+            if (hullIntegrity > 40f)
+            {
+                hull35WarningPlayed = false;
+            }
+            if (hullIntegrity > 30f)
+            {
+                hull25WarningPlayed = false;
+            }
+            
+            previousHullIntegrity = hullIntegrity;
         }
         
         #endregion
@@ -303,6 +440,49 @@ namespace BNG
             {
                 criticalHealthEffects.SetActive(playerHealth < 30f);
             }
+        }
+        
+        void UpdateHealthWarnings()
+        {
+            // Предупреждение при 50% здоровья
+            if (playerHealth <= 50f && previousPlayerHealth > 50f && !health50WarningPlayed)
+            {
+                PlayWarningSound(health50PercentWarning);
+                health50WarningPlayed = true;
+                OnLowHealthWarning?.Invoke();
+                Debug.LogWarning("⚠️ ВНИМАНИЕ: Здоровье упало до 50%!");
+            }
+            
+            // Критическое предупреждение при 25% здоровья
+            if (playerHealth <= 25f && previousPlayerHealth > 25f && !health25WarningPlayed)
+            {
+                PlayWarningSound(health25PercentWarning);
+                health25WarningPlayed = true;
+                OnCriticalWarning?.Invoke();
+                Debug.LogWarning("🚨 КРИТИЧЕСКОЕ: Здоровье 25%!");
+            }
+            
+            // Звук сердцебиения при критическом здоровье (< 30%)
+            if (playerHealth < 30f && heartbeatSound != null)
+            {
+                if (Time.time - lastHeartbeatTime >= 1.5f) // Каждые 1.5 секунды
+                {
+                    PlayWarningSound(heartbeatSound, 0.8f);
+                    lastHeartbeatTime = Time.time;
+                }
+            }
+            
+            // Сброс флагов при восстановлении
+            if (playerHealth > 55f)
+            {
+                health50WarningPlayed = false;
+            }
+            if (playerHealth > 30f)
+            {
+                health25WarningPlayed = false;
+            }
+            
+            previousPlayerHealth = playerHealth;
         }
         
         bool IsAnyRatNearby(List<GameObject> rats)
@@ -441,33 +621,32 @@ namespace BNG
             {
                 controlMalfunctionTimer += Time.deltaTime;
                 
-                // ОБНОВЛЕНО: Уведомляем UI о таймере
                 OnControlTimerUpdate?.Invoke(controlMalfunctionTimer);
                 
                 float remaining = maxControlMalfunctionTime - controlMalfunctionTimer;
                 
-                // НОВОЕ: Звуковое предупреждение за 30 секунд
+                // Звуковое предупреждение за 30 секунд
                 if (remaining <= 30f && !control30SecWarningPlayed)
                 {
-                    PlayTimerWarning(timer30SecWarning);
+                    PlayWarningSound(timer30SecWarning);
                     control30SecWarningPlayed = true;
                     OnCriticalWarning?.Invoke();
                     OnControlWarning?.Invoke();
                     Debug.LogWarning("⚠️ ПРЕДУПРЕЖДЕНИЕ: 30 секунд до потери управления!");
                 }
                 
-                // НОВОЕ: Критическое предупреждение за 10 секунд
+                // Критическое предупреждение за 10 секунд
                 if (remaining <= 10f && !control10SecWarningPlayed)
                 {
-                    PlayTimerWarning(timer10SecWarning);
+                    PlayWarningSound(timer10SecWarning);
                     control10SecWarningPlayed = true;
                     Debug.LogWarning("🚨 КРИТИЧЕСКОЕ: 10 секунд до потери управления!");
                 }
                 
-                // НОВОЕ: Звуковые сигналы каждые 5 секунд в критическое время
+                // Звуковые сигналы каждые 5 секунд в критическое время
                 if (remaining <= 30f && Time.time - controlLastBeepTime >= criticalBeepInterval)
                 {
-                    PlayTimerWarning(timerBeepSound);
+                    PlayWarningSound(timerBeepSound);
                     controlLastBeepTime = Time.time;
                 }
                 
@@ -504,8 +683,32 @@ namespace BNG
             {
                 batteryEmptyTimer += Time.deltaTime;
                 
-                // НОВОЕ: Уведомляем UI о таймере
                 OnBatteryTimerUpdate?.Invoke(batteryEmptyTimer);
+                
+                // НОВОЕ: Звук при начале кризиса батареи
+                if (!batteryCrisisStartPlayed)
+                {
+                    PlayWarningSound(batteryCrisisStartSound);
+                    batteryCrisisStartPlayed = true;
+                    OnCriticalWarning?.Invoke();
+                    OnBatteryWarning?.Invoke();
+                    Debug.LogWarning("🔋 ВНИМАНИЕ: Батарея разряжена! Начинается кризис!");
+                }
+                
+                // Предупреждение на середине времени
+                if (batteryEmptyTimer >= maxBatteryEmptyTime * 0.5f && !batteryWarningPlayed)
+                {
+                    PlayWarningSound(batteryWarningSound);
+                    batteryWarningPlayed = true;
+                    Debug.LogWarning("🚨 ОПАСНОСТЬ: Половина времени батареи истекла!");
+                }
+                
+                // Звуковые сигналы каждые 5 секунд
+                if (Time.time - lastBatteryBeepTime >= criticalBeepInterval)
+                {
+                    PlayWarningSound(timerBeepSound);
+                    lastBatteryBeepTime = Time.time;
+                }
                 
                 if (batteryEmptyTimer >= 25f && batteryEmptyTimer < 25.5f)
                 {
@@ -517,13 +720,25 @@ namespace BNG
                 {
                     SpawnEmergencyHole();
                     nextHoleSpawnTime = batteryEmptyTimer + holeSpawnInterval;
+                    
+                    // НОВОЕ: Звук при появлении пробоины
+                    PlayWarningSound(batteryHoleSpawnSound);
+                    
                     Debug.LogWarning($"💥 Без защиты батарей! Новая пробоина! (Таймер: {batteryEmptyTimer:F0}с)");
                 }
             }
             else
             {
+                // Сброс при восстановлении батареи
+                if (batteryCrisisStartPlayed)
+                {
+                    Debug.Log("✓ Батарея восстановлена!");
+                }
+                
                 batteryEmptyTimer = 0f;
                 nextHoleSpawnTime = holeSpawnInterval;
+                batteryCrisisStartPlayed = false;
+                batteryWarningPlayed = false;
                 OnBatteryTimerUpdate?.Invoke(0f);
             }
         }
@@ -546,9 +761,19 @@ namespace BNG
             
             if (isCriticalPinSituation)
             {
+                // НОВОЕ: Звук при начале кислородного кризиса (все пины вынуты)
                 if (!isOxygenCritical)
                 {
                     isOxygenCritical = true;
+                    
+                    // Воспроизводим звук начала кризиса
+                    if (!oxygenCrisisStartPlayed)
+                    {
+                        PlayWarningSound(oxygenCrisisStartSound);
+                        oxygenCrisisStartPlayed = true;
+                        Debug.LogWarning("🔴 ТРЕВОГА: Все пины вынуты! Кислород начинает падать!");
+                    }
+                    
                     OnCriticalWarning?.Invoke();
                     OnOxygenWarning?.Invoke();
                     Debug.LogWarning("⚠️ КРИТИЧЕСКОЕ: Все пины вынуты или изношены! Кислород падает!");
@@ -556,6 +781,43 @@ namespace BNG
                 
                 oxygenLevel -= oxygenDepletionRate * Time.deltaTime;
                 oxygenLevel = Mathf.Clamp(oxygenLevel, 0f, 100f);
+                
+                // НОВОЕ: Пороговые предупреждения кислорода
+                
+                // Предупреждение при 50% кислорода
+                if (oxygenLevel <= 50f && previousOxygenLevel > 50f && !oxygen50WarningPlayed)
+                {
+                    PlayWarningSound(oxygen50PercentWarning);
+                    oxygen50WarningPlayed = true;
+                    Debug.LogWarning("⚠️ ВНИМАНИЕ: Кислород упал до 50%!");
+                }
+                
+                // Предупреждение при 25% кислорода
+                if (oxygenLevel <= 25f && previousOxygenLevel > 25f && !oxygen25WarningPlayed)
+                {
+                    PlayWarningSound(oxygen25PercentWarning);
+                    oxygen25WarningPlayed = true;
+                    OnCriticalWarning?.Invoke();
+                    Debug.LogWarning("🚨 ОПАСНОСТЬ: Кислород упал до 25%!");
+                }
+                
+                // Последний шанс при 10% кислорода
+                if (oxygenLevel <= 10f && previousOxygenLevel > 10f && !oxygen10WarningPlayed)
+                {
+                    PlayWarningSound(oxygen10PercentWarning);
+                    oxygen10WarningPlayed = true;
+                    Debug.LogWarning("💀 КРИТИЧЕСКОЕ: Кислород 10%! Срочно вставьте пин!");
+                }
+                
+                // Постоянная тревога при низком кислороде (< 30%)
+                if (oxygenLevel < 30f && oxygenAlarmLoop != null)
+                {
+                    if (Time.time - lastOxygenAlarmTime >= criticalBeepInterval)
+                    {
+                        PlayWarningSound(oxygenAlarmLoop);
+                        lastOxygenAlarmTime = Time.time;
+                    }
+                }
                 
                 if (criticalOxygenEffects != null)
                 {
@@ -568,10 +830,27 @@ namespace BNG
                 {
                     isOxygenCritical = false;
                     Debug.Log("✓ Кислород восстановлен - пин вставлен!");
+                    
+                    // Сбрасываем флаги при восстановлении
+                    oxygenCrisisStartPlayed = false;
                 }
                 
                 oxygenLevel += (oxygenDepletionRate / 2f) * Time.deltaTime;
                 oxygenLevel = Mathf.Clamp(oxygenLevel, 0f, 100f);
+                
+                // Сброс флагов предупреждений при восстановлении кислорода
+                if (oxygenLevel > 55f)
+                {
+                    oxygen50WarningPlayed = false;
+                }
+                if (oxygenLevel > 30f)
+                {
+                    oxygen25WarningPlayed = false;
+                }
+                if (oxygenLevel > 15f)
+                {
+                    oxygen10WarningPlayed = false;
+                }
                 
                 if (criticalOxygenEffects != null)
                 {
@@ -579,6 +858,7 @@ namespace BNG
                 }
             }
             
+            previousOxygenLevel = oxygenLevel;
             OnOxygenLevelChanged?.Invoke(oxygenLevel);
         }
         
@@ -608,13 +888,27 @@ namespace BNG
         
         #region Audio Warning System
         
-        // НОВОЕ: Воспроизведение звукового предупреждения
-        void PlayTimerWarning(AudioClip clip)
+        /// <summary>
+        /// Воспроизведение звукового предупреждения
+        /// </summary>
+        void PlayWarningSound(AudioClip clip, float volumeMultiplier = 1f)
         {
-            if (timerWarningAudioSource != null && clip != null)
+            if (warningAudioSource != null && clip != null)
             {
-                timerWarningAudioSource.PlayOneShot(clip);
-                Debug.Log($"🔊 Воспроизведено предупреждение: {clip.name}");
+                warningAudioSource.PlayOneShot(clip, warningVolume * volumeMultiplier);
+                Debug.Log($"🔊 Звук: {clip.name}");
+            }
+        }
+        
+        /// <summary>
+        /// Воспроизведение предупреждения с проверкой cooldown
+        /// </summary>
+        void PlayWarningWithCooldown(AudioClip clip, ref float lastPlayTime)
+        {
+            if (Time.time - lastPlayTime >= warningCooldown)
+            {
+                PlayWarningSound(clip);
+                lastPlayTime = Time.time;
             }
         }
         
@@ -665,7 +959,7 @@ namespace BNG
             
             if (oxygenLevel <= criticalOxygenLevel)
             {
-                TriggerGameOver("Кислород закончился! Все системы креплений отказали.");
+                TriggerGameOver("Кислород закончился! Все системы кислорода отказали.");
                 return;
             }
         }
@@ -770,7 +1064,6 @@ namespace BNG
             return count;
         }
         
-        // НОВОЕ: Методы для получения информации о таймерах
         public TimerInfo GetControlTimer()
         {
             if (controlPanelMalfunction != null && controlPanelMalfunction.IsMalfunctionActive() 
@@ -814,10 +1107,44 @@ namespace BNG
             wasLowHealth = false;
             ratBiteCooldowns.Clear();
             
-            // Сбрасываем флаги предупреждений
+            // Сбрасываем все флаги предупреждений
+            ResetAllWarningFlags();
+            
+            // Сбрасываем предыдущие значения
+            previousHullIntegrity = 100f;
+            previousOxygenLevel = 100f;
+            previousPlayerHealth = 100f;
+        }
+        
+        void ResetAllWarningFlags()
+        {
+            // Контроль
             control30SecWarningPlayed = false;
             control10SecWarningPlayed = false;
             controlLastBeepTime = 0f;
+            
+            // Кислород
+            oxygenCrisisStartPlayed = false;
+            oxygen50WarningPlayed = false;
+            oxygen25WarningPlayed = false;
+            oxygen10WarningPlayed = false;
+            lastOxygenAlarmTime = 0f;
+            
+            // Батарея
+            batteryCrisisStartPlayed = false;
+            batteryWarningPlayed = false;
+            lastBatteryBeepTime = 0f;
+            
+            // Герметичность
+            hull50WarningPlayed = false;
+            hull35WarningPlayed = false;
+            hull25WarningPlayed = false;
+            lastHullAlarmTime = 0f;
+            
+            // Здоровье
+            health50WarningPlayed = false;
+            health25WarningPlayed = false;
+            lastHeartbeatTime = 0f;
         }
         
         public void DamagePlayer(float damage, bool showEffects = true)
@@ -835,10 +1162,34 @@ namespace BNG
         
         public bool IsGameOver() => isGameOver;
         
+        /// <summary>
+        /// Принудительно воспроизвести предупреждение (для тестирования)
+        /// </summary>
+        public void TestPlayWarning(string warningType)
+        {
+            switch (warningType.ToLower())
+            {
+                case "oxygen":
+                    PlayWarningSound(oxygenCrisisStartSound);
+                    break;
+                case "battery":
+                    PlayWarningSound(batteryCrisisStartSound);
+                    break;
+                case "hull":
+                    PlayWarningSound(hull50PercentWarning);
+                    break;
+                case "health":
+                    PlayWarningSound(health50PercentWarning);
+                    break;
+                case "control":
+                    PlayWarningSound(timer30SecWarning);
+                    break;
+            }
+        }
+        
         #endregion
     }
     
-    // НОВОЕ: Структура для передачи информации о таймере
     [System.Serializable]
     public struct TimerInfo
     {
