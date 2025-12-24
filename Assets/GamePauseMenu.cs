@@ -155,14 +155,38 @@ namespace VRMenu
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
             
+            // Устанавливаем слой UI
+            int uiLayer = LayerMask.NameToLayer("UI");
+            if (uiLayer == -1) uiLayer = LayerMask.NameToLayer("Default");
+            canvasObj.layer = uiLayer;
+            
             canvasObj.GetComponent<RectTransform>().sizeDelta = new Vector2(MENU_WIDTH, MENU_HEIGHT);
-            canvasObj.AddComponent<GraphicRaycaster>();
+            
+            GraphicRaycaster raycaster = canvasObj.AddComponent<GraphicRaycaster>();
+            raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+            
+            // BoxCollider для BNG Physics Raycast
+            BoxCollider collider = canvasObj.AddComponent<BoxCollider>();
+            collider.size = new Vector3(MENU_WIDTH, MENU_HEIGHT, 1f);
+            collider.isTrigger = true;
             
             CreatePausePanel(canvasObj.transform);
             CreateSettingsPanel(canvasObj.transform);
             CreateConfirmPanel(canvasObj.transform);
             
+            // Устанавливаем слой на все дочерние объекты
+            SetLayerRecursively(menuRoot, uiLayer);
+            
             ShowPauseMenu();
+        }
+        
+        private void SetLayerRecursively(GameObject obj, int layer)
+        {
+            obj.layer = layer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, layer);
+            }
         }
         
         private void CreatePausePanel(Transform parent)

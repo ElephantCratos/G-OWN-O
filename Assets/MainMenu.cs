@@ -3,6 +3,8 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
 using System.Collections.Generic;
+using UnityEngine.EventSystems;
+using BNG;
 
 namespace VRMenu
 {
@@ -29,12 +31,12 @@ namespace VRMenu
         private GameObject menuRoot;
         private Canvas canvas;
         private AudioSource audioSource;
-        private List<Button> menuButtons = new List<Button>();
+        private List<UnityEngine.UI.Button> menuButtons = new List<UnityEngine.UI.Button>();
         
         private GameObject mainMenuPanel;
         private GameObject settingsPanel;
         
-        private Slider volumeSlider;
+        private UnityEngine.UI.Slider volumeSlider;
         private TextMeshProUGUI volumeValueText;
         
         private const float MENU_WIDTH = 400f;
@@ -90,15 +92,46 @@ namespace VRMenu
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
             
+            // Устанавливаем слой UI
+            canvasObj.layer = LayerMask.NameToLayer("UI");
+            if (canvasObj.layer == -1)
+            {
+                canvasObj.layer = LayerMask.NameToLayer("Default");
+            }
+            
             RectTransform canvasRect = canvasObj.GetComponent<RectTransform>();
             canvasRect.sizeDelta = new Vector2(MENU_WIDTH, MENU_HEIGHT);
             
-            canvasObj.AddComponent<GraphicRaycaster>();
+            // GraphicRaycaster для взаимодействия
+            GraphicRaycaster raycaster = canvasObj.AddComponent<GraphicRaycaster>();
+            raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+            
+            // CanvasGroup
+            CanvasGroup canvasGroup = canvasObj.AddComponent<CanvasGroup>();
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+            
+            // Добавляем BoxCollider для PhysicsRaycaster (BNG часто использует это)
+            BoxCollider collider = canvasObj.AddComponent<BoxCollider>();
+            collider.size = new Vector3(MENU_WIDTH, MENU_HEIGHT, 1f);
+            collider.isTrigger = true;
             
             CreateMainMenuPanel(canvasObj.transform);
             CreateSettingsPanel(canvasObj.transform);
             
+            // Устанавливаем слой UI на все дочерние объекты
+            SetLayerRecursively(menuRoot, canvasObj.layer);
+            
             ShowMainMenu();
+        }
+        
+        private void SetLayerRecursively(GameObject obj, int layer)
+        {
+            obj.layer = layer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, layer);
+            }
         }
         
         private void CreateMainMenuPanel(Transform parent)
@@ -106,6 +139,7 @@ namespace VRMenu
             mainMenuPanel = CreatePanel(parent, "MainMenuPanel", Vector2.zero, new Vector2(MENU_WIDTH, MENU_HEIGHT));
             Image bgImage = mainMenuPanel.GetComponent<Image>();
             bgImage.color = backgroundColor;
+            bgImage.raycastTarget = true; // Важно для блокировки лучей
             
             RectTransform bgRect = mainMenuPanel.GetComponent<RectTransform>();
             bgRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -149,10 +183,10 @@ namespace VRMenu
             CreateMenuButton(containerRect, "NewGame", "НОВАЯ ИГРА", 
                 new Vector2(0, startY), OnNewGame, true);
             
-            CreateMenuButton(containerRect, "LoadGame", "ЗАГРYЗИТЬ", 
+            CreateMenuButton(containerRect, "LoadGame", "ЗАГРУЗИТЬ", 
                 new Vector2(0, startY - (BUTTON_HEIGHT + BUTTON_SPACING)), OnLoadGame, false);
             
-            CreateMenuButton(containerRect, "Settings", "НАСТРОИКИ", 
+            CreateMenuButton(containerRect, "Settings", "НАСТРОЙКИ", 
                 new Vector2(0, startY - 2 * (BUTTON_HEIGHT + BUTTON_SPACING)), OnSettings, true);
             
             CreateMenuButton(containerRect, "Exit", "ВЫХОД", 
@@ -175,13 +209,14 @@ namespace VRMenu
             settingsPanel = CreatePanel(parent, "SettingsPanel", Vector2.zero, new Vector2(MENU_WIDTH, MENU_HEIGHT));
             Image bgImage = settingsPanel.GetComponent<Image>();
             bgImage.color = backgroundColor;
+            bgImage.raycastTarget = true;
             
             RectTransform bgRect = settingsPanel.GetComponent<RectTransform>();
             bgRect.anchorMin = new Vector2(0.5f, 0.5f);
             bgRect.anchorMax = new Vector2(0.5f, 0.5f);
             bgRect.pivot = new Vector2(0.5f, 0.5f);
             
-            GameObject titleObj = CreateText(settingsPanel.transform, "Title", "НАСТРОИКИ", 32, FontStyles.Bold);
+            GameObject titleObj = CreateText(settingsPanel.transform, "Title", "НАСТРОЙКИ", 32, FontStyles.Bold);
             RectTransform titleRect = titleObj.GetComponent<RectTransform>();
             titleRect.anchorMin = new Vector2(0, 0.85f);
             titleRect.anchorMax = new Vector2(1, 1f);
@@ -213,7 +248,7 @@ namespace VRMenu
             sliderContainerRect.anchoredPosition = new Vector2(0, 50);
             sliderContainerRect.sizeDelta = new Vector2(MENU_WIDTH * 0.85f, 80);
             
-            volumeSlider = CreateVolumeSlider(sliderContainerRect, "Volume", "ГРОMКОСТЬ", out volumeValueText);
+            volumeSlider = CreateVolumeSlider(sliderContainerRect, "Volume", "ГРОМКОСТЬ", out volumeValueText);
             
             // Back button
             GameObject backContainer = new GameObject("BackContainer");
@@ -232,7 +267,7 @@ namespace VRMenu
             CreateMenuButton(backRect, "Back", "← НАЗАД", Vector2.zero, OnBackToMainMenu, true);
         }
         
-        private Slider CreateVolumeSlider(RectTransform parent, string name, string label, out TextMeshProUGUI valueText)
+        private UnityEngine.UI.Slider CreateVolumeSlider(RectTransform parent, string name, string label, out TextMeshProUGUI valueText)
         {
             // Label
             GameObject labelObj = CreateText(parent, "Label", label, 20, FontStyles.Bold);
@@ -267,7 +302,7 @@ namespace VRMenu
             sliderRect.offsetMin = Vector2.zero;
             sliderRect.offsetMax = Vector2.zero;
             
-            Slider slider = sliderObj.AddComponent<Slider>();
+            UnityEngine.UI.Slider slider = sliderObj.AddComponent<UnityEngine.UI.Slider>();
             slider.minValue = 0f;
             slider.maxValue = 1f;
             slider.value = 1f;
@@ -281,6 +316,7 @@ namespace VRMenu
             
             Image bgImage = bgObj.AddComponent<Image>();
             bgImage.color = buttonColor;
+            bgImage.raycastTarget = true;
             
             RectTransform bgRectT = bgObj.GetComponent<RectTransform>();
             bgRectT.anchorMin = Vector2.zero;
@@ -310,6 +346,7 @@ namespace VRMenu
             
             Image fillImage = fillObj.AddComponent<Image>();
             fillImage.color = accentColor;
+            fillImage.raycastTarget = true;
             
             RectTransform fillRect = fillObj.GetComponent<RectTransform>();
             fillRect.anchorMin = Vector2.zero;
@@ -341,6 +378,7 @@ namespace VRMenu
             
             Image handleImage = handleObj.AddComponent<Image>();
             handleImage.color = Color.white;
+            handleImage.raycastTarget = true;
             
             RectTransform handleRect = handleObj.GetComponent<RectTransform>();
             handleRect.sizeDelta = new Vector2(20, 0);
@@ -405,9 +443,9 @@ namespace VRMenu
             
             Image buttonImage = buttonObj.AddComponent<Image>();
             buttonImage.color = interactable ? buttonColor : disabledColor;
-            buttonImage.raycastTarget = true;
+            buttonImage.raycastTarget = true; // ВАЖНО для VR!
             
-            Button button = buttonObj.AddComponent<Button>();
+            UnityEngine.UI.Button button = buttonObj.AddComponent<UnityEngine.UI.Button>();
             button.targetGraphic = buttonImage;
             button.interactable = interactable;
             
@@ -425,13 +463,15 @@ namespace VRMenu
                 button.onClick.AddListener(PlayClickSound);
             }
             
-            UnityEngine.EventSystems.EventTrigger trigger = buttonObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            // Hover events для звука
+            EventTrigger trigger = buttonObj.AddComponent<EventTrigger>();
             
-            var pointerEnter = new UnityEngine.EventSystems.EventTrigger.Entry();
-            pointerEnter.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
+            var pointerEnter = new EventTrigger.Entry();
+            pointerEnter.eventID = EventTriggerType.PointerEnter;
             pointerEnter.callback.AddListener((data) => { if (interactable) PlayHoverSound(); });
             trigger.triggers.Add(pointerEnter);
             
+            // Акцентная линия
             GameObject accentLineObj = CreatePanel(buttonObj.transform, "Accent", Vector2.zero, new Vector2(4, BUTTON_HEIGHT));
             RectTransform accentRect = accentLineObj.GetComponent<RectTransform>();
             accentRect.anchorMin = new Vector2(0, 0);
@@ -441,6 +481,7 @@ namespace VRMenu
             accentRect.sizeDelta = new Vector2(4, 0);
             accentLineObj.GetComponent<Image>().color = interactable ? accentColor : disabledColor;
             
+            // Текст
             GameObject textObj = CreateText(buttonObj.transform, "Label", label, 22, FontStyles.Bold);
             RectTransform textRect = textObj.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;

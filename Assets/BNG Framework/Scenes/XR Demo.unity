@@ -29179,12 +29179,6 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 404449992}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &404582091 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2683195716759056386, guid: 4ac7df741a9c0a2418ec19477729ee3d,
-    type: 3}
-  m_PrefabInstance: {fileID: 2634128103435655830}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &404584378
 GameObject:
   m_ObjectHideFlags: 0
@@ -135615,9 +135609,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad0a418e0ee63d045af962d1b39b13b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  menuButtonType: 0
+  menuButtonType: 2
   menuKey: 27
-  pauseGameOnOpen: 1
+  pauseGameOnOpen: 0
   menuSpawnPoint: {fileID: 913013596}
   distanceFromCamera: 4
   menuHeight: 0.3
@@ -156497,7 +156491,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   hullIntegrity: 100
-  integrityLossPerHole: 8
+  integrityLossPerHole: 6
   criticalIntegrityLevel: 20
   playerHealth: 100
   maxPlayerHealth: 100
@@ -156508,40 +156502,33 @@ MonoBehaviour:
   maxSimultaneousBites: 5
   playerTransform: {fileID: 0}
   controlMalfunctionTimer: 0
-  maxControlMalfunctionTime: 300
+  maxControlMalfunctionTime: 350
   batteryEmptyTimer: 0
-  maxBatteryEmptyTime: 30
+  maxBatteryEmptyTime: 50
   holeSpawnInterval: 5
   oxygenLevel: 100
   oxygenDepletionRate: 5
   criticalOxygenLevel: 0
   warningAudioSource: {fileID: 0}
-  timer30SecWarning: {fileID: 8300000, guid: 22b4031a3cb0a824fa9d350ce9710754, type: 3}
-  timer10SecWarning: {fileID: 8300000, guid: 22b4031a3cb0a824fa9d350ce9710754, type: 3}
-  timerBeepSound: {fileID: 8300000, guid: 22b4031a3cb0a824fa9d350ce9710754, type: 3}
+  timer30SecWarning: {fileID: 0}
+  timer10SecWarning: {fileID: 0}
+  timerBeepSound: {fileID: 0}
   criticalBeepInterval: 5
   oxygenCrisisStartSound: {fileID: 0}
   oxygen50PercentWarning: {fileID: 0}
   oxygen25PercentWarning: {fileID: 0}
   oxygen10PercentWarning: {fileID: 0}
-  oxygenAlarmLoop: {fileID: 8300000, guid: b5146bdd4deb55246ac79561d532bb83, type: 3}
-  batteryCrisisStartSound: {fileID: 8300000, guid: 8c9ae32c5b6b58b4482d3b4117a0b323,
-    type: 3}
-  batteryWarningSound: {fileID: 8300000, guid: 8c9ae32c5b6b58b4482d3b4117a0b323, type: 3}
-  batteryHoleSpawnSound: {fileID: 8300000, guid: 8c9ae32c5b6b58b4482d3b4117a0b323,
-    type: 3}
-  hull50PercentWarning: {fileID: 8300000, guid: e1f087317cf46904285104590f6f0bac,
-    type: 3}
-  hull35PercentWarning: {fileID: 8300000, guid: e1f087317cf46904285104590f6f0bac,
-    type: 3}
-  hull25PercentWarning: {fileID: 8300000, guid: e1f087317cf46904285104590f6f0bac,
-    type: 3}
-  hullAlarmLoop: {fileID: 8300000, guid: e1f087317cf46904285104590f6f0bac, type: 3}
-  health50PercentWarning: {fileID: 8300000, guid: fb2e8472d5a945549acdfef96b134000,
-    type: 3}
-  health25PercentWarning: {fileID: 8300000, guid: fb2e8472d5a945549acdfef96b134000,
-    type: 3}
-  heartbeatSound: {fileID: 8300000, guid: fb2e8472d5a945549acdfef96b134000, type: 3}
+  oxygenAlarmLoop: {fileID: 0}
+  batteryCrisisStartSound: {fileID: 0}
+  batteryWarningSound: {fileID: 0}
+  batteryHoleSpawnSound: {fileID: 0}
+  hull50PercentWarning: {fileID: 0}
+  hull35PercentWarning: {fileID: 0}
+  hull25PercentWarning: {fileID: 0}
+  hullAlarmLoop: {fileID: 0}
+  health50PercentWarning: {fileID: 0}
+  health25PercentWarning: {fileID: 0}
+  heartbeatSound: {fileID: 0}
   warningCooldown: 10
   warningVolume: 1
   disableInteractionOnGameOver: 1
@@ -160459,12 +160446,12 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 913013595}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 1.404}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.81, z: 1.4039999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
-  m_Father: {fileID: 404582091}
-  m_RootOrder: 6
+  m_Father: {fileID: 4144118093912075215}
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &913887067
 GameObject:
@@ -184554,7 +184541,7 @@ MonoBehaviour:
   scanSpeed: 5
   scanlineThickness: 0.01
   scanlineBrightness: 2
-  activationButton: 3
+  activationButton: 1
   controllerHand: 1
   toggleOnSound: {fileID: 8300000, guid: f6ba2c16c86180148906c2b6840404ae, type: 3}
   toggleOffSound: {fileID: 0}
@@ -238648,9 +238635,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   dayEventManager: {fileID: 849538651}
   playerCamera: {fileID: 0}
-  distanceFromPlayer: 0.5
+  distanceFromPlayer: 0.8
   testKey: 9
-  vrButton: 7
+  vrButton: 5
   menuPanel: {fileID: 0}
 --- !u!4 &1869083007
 Transform:
