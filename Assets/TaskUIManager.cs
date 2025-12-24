@@ -22,6 +22,7 @@ public class TaskUIManager : MonoBehaviour
     public ControlPanelMalfunction controlPanelMalfunction;
     public PinReplacementTask pinReplacementTask;
     public BatteryReplacementEvent batteryReplacementEvent;
+    public GameOverManager gameOverManager; // НОВОЕ: Ссылка на GameOverManager для таймеров
     
     [Header("VR Input Settings")]
     [Tooltip("Кнопка на левом контроллере для открытия меню")]
@@ -54,7 +55,6 @@ public class TaskUIManager : MonoBehaviour
     
     void Start()
     {
-        // Получаем InputBridge из BNG
         input = InputBridge.Instance;
         
         if (input == null)
@@ -86,6 +86,16 @@ public class TaskUIManager : MonoBehaviour
             Debug.LogError("TaskUIManager: Task Card Container не назначен!");
         }
         
+        // НОВОЕ: Автопоиск GameOverManager
+        if (gameOverManager == null)
+        {
+            gameOverManager = FindObjectOfType<GameOverManager>();
+            if (gameOverManager == null)
+            {
+                Debug.LogWarning("TaskUIManager: GameOverManager не найден! Таймеры не будут отображаться.");
+            }
+        }
+        
         if (dayEventManager != null)
         {
             dayEventManager.OnNewDayStarted.AddListener(OnNewDay);
@@ -105,31 +115,26 @@ public class TaskUIManager : MonoBehaviour
     {
         if (input == null) return;
         
-        // Проверяем нажатие кнопок на контроллерах (детектируем момент нажатия)
         bool currentLeftState = useLeftController && input.GetControllerBindingValue(leftControllerButton);
         bool currentRightState = useRightController && input.GetControllerBindingValue(rightControllerButton);
         
-        // Левый контроллер - срабатывает при нажатии (не при удержании)
         if (currentLeftState && !leftButtonPressed)
         {
             ToggleUI();
         }
         leftButtonPressed = currentLeftState;
         
-        // Правый контроллер - срабатывает при нажатии (не при удержании)
         if (currentRightState && !rightButtonPressed)
         {
             ToggleUI();
         }
         rightButtonPressed = currentRightState;
         
-        // Для тестирования в редакторе
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleUI();
         }
         
-        // Обновляем прогресс если UI открыто
         if (taskUIPanel != null && taskUIPanel.activeSelf)
         {
             updateTimer += Time.deltaTime;
@@ -141,17 +146,15 @@ public class TaskUIManager : MonoBehaviour
         }
     }
     
-    // Метод для тестирования и отладки
     void OnGUI()
     {
         if (input == null) return;
         
-        // Показываем состояние кнопок в левом верхнем углу
         GUILayout.BeginArea(new Rect(10, 10, 300, 150));
         GUILayout.Label($"Left Button: {input.GetControllerBindingValue(leftControllerButton)}");
         GUILayout.Label($"Right Button: {input.GetControllerBindingValue(rightControllerButton)}");
         GUILayout.Label($"UI Active: {(taskUIPanel != null ? taskUIPanel.activeSelf : false)}");
-        GUILayout.Label("Press Space to toggle (editor)");
+        GUILayout.Label("Press Tab to toggle (editor)");
         GUILayout.EndArea();
     }
     
@@ -266,6 +269,37 @@ public class TaskUIManager : MonoBehaviour
             string progress = GetEventProgress(eventName);
             
             card.UpdateProgress(progress, isCompleted);
+            
+            // НОВОЕ: Обновляем таймер для карточки
+            UpdateCardTimer(eventName, card);
+        }
+    }
+    
+    // НОВОЕ: Обновление таймера для конкретной карточки
+    private void UpdateCardTimer(string eventName, TaskCard card)
+    {
+        if (gameOverManager == null) return;
+        
+        TimerInfo timerInfo = new TimerInfo(-1, 0);
+        
+        switch (eventName)
+        {
+            case "FixControls":
+                timerInfo = gameOverManager.GetControlTimer();
+                break;
+                
+            case "ReplaceBattery":
+                timerInfo = gameOverManager.GetBatteryTimer();
+                break;
+        }
+        
+        if (timerInfo.isActive)
+        {
+            card.UpdateTimer(timerInfo.currentTime, timerInfo.maxTime);
+        }
+        else
+        {
+            card.UpdateTimer(-1, 0);
         }
     }
     

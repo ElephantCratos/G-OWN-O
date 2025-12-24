@@ -156494,13 +156494,18 @@ MonoBehaviour:
   maxSimultaneousBites: 5
   playerTransform: {fileID: 0}
   controlMalfunctionTimer: 0
-  maxControlMalfunctionTime: 300
+  maxControlMalfunctionTime: 35
   batteryEmptyTimer: 0
   maxBatteryEmptyTime: 30
   holeSpawnInterval: 5
   oxygenLevel: 100
   oxygenDepletionRate: 5
   criticalOxygenLevel: 0
+  timerWarningAudioSource: {fileID: 0}
+  timer30SecWarning: {fileID: 8300000, guid: 727ff3abbdb797f45b714a1795efc4e2, type: 3}
+  timer10SecWarning: {fileID: 8300000, guid: 85f8369cbb5f4b846bab482ff5018f81, type: 3}
+  timerBeepSound: {fileID: 8300000, guid: 727ff3abbdb797f45b714a1795efc4e2, type: 3}
+  criticalBeepInterval: 5
   disableInteractionOnGameOver: 1
   playerGrabbers: []
   playerLocomotion: {fileID: 0}
@@ -156525,6 +156530,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   OnCriticalWarning:
+    m_PersistentCalls:
+      m_Calls: []
+  OnControlTimerUpdate:
+    m_PersistentCalls:
+      m_Calls: []
+  OnBatteryTimerUpdate:
     m_PersistentCalls:
       m_Calls: []
   criticalHullEffects: {fileID: 0}
@@ -238514,7 +238525,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   dayEventManager: {fileID: 849538651}
   playerCamera: {fileID: 0}
-  distanceFromPlayer: 1.5
+  distanceFromPlayer: 0.5
   testKey: 9
   vrButton: 7
   menuPanel: {fileID: 0}

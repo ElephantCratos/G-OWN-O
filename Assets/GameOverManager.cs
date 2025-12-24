@@ -8,7 +8,7 @@ namespace BNG
 {
     /// <summary>
     /// Управляет критериями поражения и состоянием корабля
-    /// ОБНОВЛЕНО: Блокировка игры после Game Over
+    /// ОБНОВЛЕНО: Блокировка игры после Game Over + Звуковые предупреждения таймеров
     /// </summary>
     public class GameOverManager : MonoBehaviour
     {
@@ -55,6 +55,27 @@ namespace BNG
         public float criticalOxygenLevel = 0f;
         private bool isOxygenCritical = false;
         
+        [Header("=== ЗВУКОВЫЕ ПРЕДУПРЕЖДЕНИЯ ТАЙМЕРОВ ===")]
+        [Tooltip("Источник звука для предупреждений")]
+        public AudioSource timerWarningAudioSource;
+        
+        [Tooltip("Звук предупреждения за 30 секунд")]
+        public AudioClip timer30SecWarning;
+        
+        [Tooltip("Звук критического предупреждения (за 10 сек)")]
+        public AudioClip timer10SecWarning;
+        
+        [Tooltip("Звуковой сигнал каждые 5 секунд в критическое время")]
+        public AudioClip timerBeepSound;
+        
+        [Tooltip("Интервал сигналов в критическое время")]
+        public float criticalBeepInterval = 5f;
+        
+        // Флаги для отслеживания воспроизведенных предупреждений
+        private bool control30SecWarningPlayed = false;
+        private bool control10SecWarningPlayed = false;
+        private float controlLastBeepTime = 0f;
+        
         [Header("=== БЛОКИРОВКА ПОСЛЕ GAME OVER ===")]
         [Tooltip("Отключать ли взаимодействие с объектами после поражения")]
         public bool disableInteractionOnGameOver = true;
@@ -80,6 +101,10 @@ namespace BNG
         public UnityEvent<float> OnOxygenLevelChanged;
         public UnityEvent<string> OnGameOver;
         public UnityEvent OnCriticalWarning;
+        
+        // НОВОЕ: События для таймеров
+        public UnityEvent<float> OnControlTimerUpdate;
+        public UnityEvent<float> OnBatteryTimerUpdate;
         
         [Header("Визуальные эффекты")]
         public GameObject criticalHullEffects;
@@ -137,7 +162,7 @@ namespace BNG
                 }
             }
             
-            // НОВОЕ: Автопоиск компонентов для блокировки
+            // Автопоиск компонентов для блокировки
             if (playerGrabbers.Count == 0)
             {
                 Grabber[] foundGrabbers = FindObjectsOfType<Grabber>();
@@ -155,6 +180,18 @@ namespace BNG
                 playerTeleport = FindObjectOfType<PlayerTeleport>();
             }
             
+            // НОВОЕ: Автопоиск AudioSource если не назначен
+            if (timerWarningAudioSource == null)
+            {
+                timerWarningAudioSource = gameObject.GetComponent<AudioSource>();
+                if (timerWarningAudioSource == null)
+                {
+                    timerWarningAudioSource = gameObject.AddComponent<AudioSource>();
+                    timerWarningAudioSource.playOnAwake = false;
+                    timerWarningAudioSource.spatialBlend = 0f; // 2D звук
+                }
+            }
+            
             SetIndicatorActive(hullWarningIndicator, false);
             SetIndicatorActive(healthWarningIndicator, false);
             SetIndicatorActive(oxygenWarningIndicator, false);
@@ -165,7 +202,7 @@ namespace BNG
         
         void Update()
         {
-            // НОВОЕ: Проверяем победу - если игра выиграна, не проверяем Game Over
+            // Проверяем победу - если игра выиграна, не проверяем Game Over
             if (dayEventManager != null && dayEventManager.IsGameWon())
             {
                 return;
@@ -404,6 +441,37 @@ namespace BNG
             {
                 controlMalfunctionTimer += Time.deltaTime;
                 
+                // ОБНОВЛЕНО: Уведомляем UI о таймере
+                OnControlTimerUpdate?.Invoke(controlMalfunctionTimer);
+                
+                float remaining = maxControlMalfunctionTime - controlMalfunctionTimer;
+                
+                // НОВОЕ: Звуковое предупреждение за 30 секунд
+                if (remaining <= 30f && !control30SecWarningPlayed)
+                {
+                    PlayTimerWarning(timer30SecWarning);
+                    control30SecWarningPlayed = true;
+                    OnCriticalWarning?.Invoke();
+                    OnControlWarning?.Invoke();
+                    Debug.LogWarning("⚠️ ПРЕДУПРЕЖДЕНИЕ: 30 секунд до потери управления!");
+                }
+                
+                // НОВОЕ: Критическое предупреждение за 10 секунд
+                if (remaining <= 10f && !control10SecWarningPlayed)
+                {
+                    PlayTimerWarning(timer10SecWarning);
+                    control10SecWarningPlayed = true;
+                    Debug.LogWarning("🚨 КРИТИЧЕСКОЕ: 10 секунд до потери управления!");
+                }
+                
+                // НОВОЕ: Звуковые сигналы каждые 5 секунд в критическое время
+                if (remaining <= 30f && Time.time - controlLastBeepTime >= criticalBeepInterval)
+                {
+                    PlayTimerWarning(timerBeepSound);
+                    controlLastBeepTime = Time.time;
+                }
+                
+                // Старое предупреждение за минуту
                 if (controlMalfunctionTimer >= 240f && controlMalfunctionTimer < 240.5f)
                 {
                     OnCriticalWarning?.Invoke();
@@ -413,7 +481,12 @@ namespace BNG
             }
             else
             {
+                // Сбрасываем таймер и флаги
                 controlMalfunctionTimer = 0f;
+                control30SecWarningPlayed = false;
+                control10SecWarningPlayed = false;
+                controlLastBeepTime = 0f;
+                OnControlTimerUpdate?.Invoke(0f);
             }
         }
         
@@ -430,6 +503,9 @@ namespace BNG
             if (isBatteryEmpty)
             {
                 batteryEmptyTimer += Time.deltaTime;
+                
+                // НОВОЕ: Уведомляем UI о таймере
+                OnBatteryTimerUpdate?.Invoke(batteryEmptyTimer);
                 
                 if (batteryEmptyTimer >= 25f && batteryEmptyTimer < 25.5f)
                 {
@@ -448,6 +524,7 @@ namespace BNG
             {
                 batteryEmptyTimer = 0f;
                 nextHoleSpawnTime = holeSpawnInterval;
+                OnBatteryTimerUpdate?.Invoke(0f);
             }
         }
         
@@ -529,6 +606,20 @@ namespace BNG
         
         #endregion
         
+        #region Audio Warning System
+        
+        // НОВОЕ: Воспроизведение звукового предупреждения
+        void PlayTimerWarning(AudioClip clip)
+        {
+            if (timerWarningAudioSource != null && clip != null)
+            {
+                timerWarningAudioSource.PlayOneShot(clip);
+                Debug.Log($"🔊 Воспроизведено предупреждение: {clip.name}");
+            }
+        }
+        
+        #endregion
+        
         #region Warning Indicators
         
         void UpdateWarningIndicators()
@@ -596,7 +687,6 @@ namespace BNG
             
             StopAllSystems();
             
-            // НОВОЕ: Блокируем взаимодействие
             if (disableInteractionOnGameOver)
             {
                 DisablePlayerInteraction();
@@ -608,12 +698,10 @@ namespace BNG
             }
         }
         
-        // НОВОЕ: Метод блокировки взаимодействия
         void DisablePlayerInteraction()
         {
             Debug.Log("🔒 Блокировка взаимодействия игрока...");
             
-            // Отключаем Grabber'ы
             foreach (Grabber grabber in playerGrabbers)
             {
                 if (grabber != null)
@@ -622,13 +710,11 @@ namespace BNG
                 }
             }
             
-            // Отключаем передвижение
             if (playerLocomotion != null)
             {
                 playerLocomotion.enabled = false;
             }
             
-            // Отключаем телепортацию
             if (playerTeleport != null)
             {
                 playerTeleport.enabled = false;
@@ -684,6 +770,27 @@ namespace BNG
             return count;
         }
         
+        // НОВОЕ: Методы для получения информации о таймерах
+        public TimerInfo GetControlTimer()
+        {
+            if (controlPanelMalfunction != null && controlPanelMalfunction.IsMalfunctionActive() 
+                && !controlPanelMalfunction.IsCurrentlyFixed())
+            {
+                return new TimerInfo(controlMalfunctionTimer, maxControlMalfunctionTime);
+            }
+            return new TimerInfo(-1, 0);
+        }
+        
+        public TimerInfo GetBatteryTimer()
+        {
+            if (batteryReplacementEvent != null && batteryReplacementEvent.IsEventActive 
+                && !batteryReplacementEvent.IsCompleted)
+            {
+                return new TimerInfo(batteryEmptyTimer, maxBatteryEmptyTime);
+            }
+            return new TimerInfo(-1, 0);
+        }
+        
         public string GetSystemStatus()
         {
             int nearbyRats = GetNearbyRatsCount();
@@ -706,6 +813,11 @@ namespace BNG
             isGameOver = false;
             wasLowHealth = false;
             ratBiteCooldowns.Clear();
+            
+            // Сбрасываем флаги предупреждений
+            control30SecWarningPlayed = false;
+            control10SecWarningPlayed = false;
+            controlLastBeepTime = 0f;
         }
         
         public void DamagePlayer(float damage, bool showEffects = true)
@@ -724,5 +836,26 @@ namespace BNG
         public bool IsGameOver() => isGameOver;
         
         #endregion
+    }
+    
+    // НОВОЕ: Структура для передачи информации о таймере
+    [System.Serializable]
+    public struct TimerInfo
+    {
+        public float currentTime;
+        public float maxTime;
+        public bool isActive;
+        
+        public TimerInfo(float current, float max)
+        {
+            currentTime = current;
+            maxTime = max;
+            isActive = current >= 0;
+        }
+        
+        public float GetRemainingTime()
+        {
+            return isActive ? (maxTime - currentTime) : 0f;
+        }
     }
 }
