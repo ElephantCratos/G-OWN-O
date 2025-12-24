@@ -67,7 +67,7 @@ Material:
     - _GlossyReflections: 1
     - _Metallic: 0
     - _Mode: 0
-    - _NoiseIntensity: 9.747736e-23
+    - _NoiseIntensity: 1.56283e-13
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _ScanlineIntensity: 0.097

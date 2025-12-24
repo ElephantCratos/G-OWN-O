@@ -64,6 +64,12 @@ namespace BNG {
         private bool verticalWasKinematic;
         private bool horizontalWasKinematic;
         private bool speedWasKinematic;
+
+
+
+        public float CurrentVertical => currentVertical;
+        public float CurrentHorizontal => currentHorizontal;
+        public float CurrentSpeed => currentSpeed;
         private void Start() {
     // Кэшируем Grabbable компоненты
     if (verticalKnob != null) {
