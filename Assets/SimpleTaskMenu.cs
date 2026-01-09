@@ -234,7 +234,10 @@ public class SimpleTaskMenu : MonoBehaviour
         {
             HoleSpawner spawner = FindObjectOfType<HoleSpawner>();
             if (spawner != null)
-                return $"   Заварено: {spawner.patchedHoles}/{spawner.holesToPatch}";
+            {
+                // ИСПРАВЛЕНО: Используем новый унифицированный метод
+                return $"   {spawner.GetProgressText()}";
+            }
         }
         else if (eventName == "FixControls")
         {

@@ -39,43 +39,72 @@ public class HoleSpawner : MonoBehaviour
 
     [Header("Event Integration")]
     public DayEventManager dayEventManager;
-    public int holesToPatch = 5;
-    public int patchedHoles = 0;
+    
+    [Header("Hole Tracking - UNIFIED SYSTEM")]
+    [Tooltip("Текущее количество активных (незаделанных) дыр")]
+    public int currentActiveHoles = 0;
+    
+    [Tooltip("Сколько дыр уже заделано в этом ивенте")]
+    public int totalPatchedHoles = 0;
+    
+    [Tooltip("Всего создано дыр в этом ивенте")]
+    public int totalSpawnedHoles = 0;
 
     [Header("Hole Spawn Settings")]
     public GameObject HolePrefab;
-    public int HolesToSpawn = 5;
+    
+    [Tooltip("Количество дыр для спавна в начале ивента")]
+    public int eventHolesToSpawn = 5;
 
     private List<GameObject> spawnedHoles = new List<GameObject>();
-    private bool eventActive = false;
+    private bool isEventActive = false;
+    private bool hasEventInDayManager = false;
 
     #region Event Methods
     public void StartHoleEvent()
     {
-        eventActive = true;
-        patchedHoles = 0;
+        isEventActive = true;
+        hasEventInDayManager = true;
         
-        SpawnHoles();
+        // Сбрасываем счётчики при начале нового ивента
+        totalPatchedHoles = 0;
+        totalSpawnedHoles = 0;
         
-        Debug.Log($"Начался ивент с пробоинами! Нужно заварить: {holesToPatch}");
+        SpawnEventHoles();
+        
+        Debug.Log($"🚨 Начался ивент с пробоинами! Нужно заварить ВСЕ дыры!");
+        Debug.Log($"📊 Создано дыр: {totalSpawnedHoles}, Активных: {currentActiveHoles}");
     }
 
     public void StopHoleEvent()
     {
-        eventActive = false;
+        isEventActive = false;
+        hasEventInDayManager = false;
         
+        // Удаляем только дыры которые остались незаделанными
         foreach (var hole in spawnedHoles)
         {
             if (hole != null)
-                Destroy(hole);
+            {
+                PatchableHole patchable = hole.GetComponent<PatchableHole>();
+                if (patchable != null && !patchable.IsPatched)
+                {
+                    Destroy(hole);
+                }
+            }
         }
-        spawnedHoles.Clear();
         
-        Debug.Log("Ивент с пробоинами завершён!");
+        CleanupHolesList();
+        
+        // Сбрасываем счётчики для нового дня
+        totalPatchedHoles = 0;
+        totalSpawnedHoles = 0;
+        currentActiveHoles = 0;
+        
+        Debug.Log("✅ Ивент с пробоинами завершён! Счётчики сброшены.");
     }
 
-
-    private void SpawnHoles()
+    private void SpawnEventHoles()
     {
         if (HolePrefab == null)
         {
@@ -89,75 +118,116 @@ public class HoleSpawner : MonoBehaviour
             return;
         }
 
-        int toSpawn = Mathf.Min(HolesToSpawn, holesToPatch);
-
-        for (int i = 0; i < toSpawn; i++)
+        for (int i = 0; i < eventHolesToSpawn; i++)
         {
-            BoxCollider zone = wallSpawnZones[Random.Range(0, wallSpawnZones.Count)];
-            
-            Vector3 spawnPos;
-            Quaternion spawnRot;
-            GetRandomPointOnWall(zone, out spawnPos, out spawnRot);
-
-            GameObject hole = Instantiate(HolePrefab, spawnPos, spawnRot);
-            
-            PatchableHole patchable = hole.GetComponent<PatchableHole>();
-            if (patchable != null)
-            {
-                StartCoroutine(WatchHolePatch(patchable));
-            }
-            else
-            {
-                Debug.LogWarning($"У пробоины {hole.name} нет компонента PatchableHole!");
-            }
-            
-            spawnedHoles.Add(hole);
+            CreateHole("Event");
         }
 
-        Debug.Log($"Создано пробоин: {spawnedHoles.Count}");
+        Debug.Log($"💥 Создано пробоин от ивента: {eventHolesToSpawn}");
     }
+
     /// <summary>
-/// Возвращает количество активных дыр (для GameOverManager)
-/// </summary>
-public int GetActiveHolesCount()
-{
-    // Удаляем null объекты перед подсчётом
-    spawnedHoles.RemoveAll(h => h == null);
-    return spawnedHoles.Count;
-}
+    /// Публичный метод для создания одной дыры (для GameOverManager при разрядке батареи)
+    /// </summary>
+    public void SpawnSingleHole()
+    {
+        // НОВОЕ: Если ивента нет в списке дня, добавляем его динамически
+        if (!hasEventInDayManager && dayEventManager != null)
+        {
+            Debug.Log("⚡ Батарея создала дыру! Автоматически активируем ивент 'PatchHoles'");
+            
+            dayEventManager.AddEvent("PatchHoles");
+            isEventActive = true;
+            hasEventInDayManager = true;
+        }
+        
+        CreateHole("Battery");
+    }
 
-/// <summary>
-/// Возвращает список активных дыр (для дополнительной логики)
-/// </summary>
-public List<GameObject> GetActiveHoles()
-{
-    spawnedHoles.RemoveAll(h => h == null);
-    return new List<GameObject>(spawnedHoles);
-}
+    /// <summary>
+    /// Универсальный метод создания дыры
+    /// </summary>
+    private void CreateHole(string source)
+    {
+        if (HolePrefab == null || wallSpawnZones.Count == 0) return;
 
+        BoxCollider zone = wallSpawnZones[Random.Range(0, wallSpawnZones.Count)];
+        
+        Vector3 spawnPos;
+        Quaternion spawnRot;
+        GetRandomPointOnWall(zone, out spawnPos, out spawnRot);
 
+        GameObject hole = Instantiate(HolePrefab, spawnPos, spawnRot);
+        
+        PatchableHole patchable = hole.GetComponent<PatchableHole>();
+        if (patchable != null)
+        {
+            StartCoroutine(WatchHolePatch(patchable));
+        }
+        else
+        {
+            Debug.LogWarning($"У пробоины {hole.name} нет компонента PatchableHole!");
+        }
+        
+        spawnedHoles.Add(hole);
+        currentActiveHoles++;
+        totalSpawnedHoles++;
+        
+        Debug.Log($"💥 Создана дыра [{source}]! Всего: {totalSpawnedHoles}, Активных: {currentActiveHoles}, Заделано: {totalPatchedHoles}");
+    }
+
+    /// <summary>
+    /// Возвращает количество активных дыр (для GameOverManager)
+    /// </summary>
+    public int GetActiveHolesCount()
+    {
+        CleanupHolesList();
+        return currentActiveHoles;
+    }
+
+    /// <summary>
+    /// Возвращает список активных дыр
+    /// </summary>
+    public List<GameObject> GetActiveHoles()
+    {
+        CleanupHolesList();
+        return new List<GameObject>(spawnedHoles);
+    }
+
+    /// <summary>
+    /// Очистка списка от null объектов и обновление счётчика
+    /// </summary>
+    private void CleanupHolesList()
+    {
+        spawnedHoles.RemoveAll(h => h == null);
+        
+        // Пересчитываем активные дыры (незаделанные)
+        int activeCount = 0;
+        foreach (var hole in spawnedHoles)
+        {
+            PatchableHole patchable = hole.GetComponent<PatchableHole>();
+            if (patchable != null && !patchable.IsPatched)
+            {
+                activeCount++;
+            }
+        }
+        currentActiveHoles = activeCount;
+    }
 
     public void GetRandomPointOnWall(BoxCollider zone, out Vector3 position, out Quaternion rotation)
     {
         Transform zoneTransform = zone.transform;
         
-        // Генерируем случайную точку на внутренней поверхности зоны
         Vector3 localPoint = new Vector3(
             Random.Range(-zone.size.x / 2f, zone.size.x / 2f),
             Random.Range(-zone.size.y / 2f, zone.size.y / 2f),
-            -zone.size.z / 2f  // На внутренней грани (локальная ось -Z)
+            -zone.size.z / 2f
         );
         
-        // Переводим в мировые координаты
         Vector3 worldPoint = zoneTransform.TransformPoint(zone.center + localPoint);
-        
-        // Направление внутрь = локальная ось -Z зоны в мировом пространстве
         Vector3 inwardDirection = -zoneTransform.forward;
         
-        // Применяем offset вдоль этого направления
         position = worldPoint + inwardDirection * WallOffset;
-        
-        // Пробоина смотрит в том же направлении (внутрь помещения)
         rotation = Quaternion.LookRotation(inwardDirection);
     }
 
@@ -176,19 +246,49 @@ public List<GameObject> GetActiveHoles()
 
     private void OnHolePatched()
     {
-        if (!eventActive) return;
+        totalPatchedHoles++;
+        currentActiveHoles = Mathf.Max(0, currentActiveHoles - 1);
+        
+        Debug.Log($"🔧 Заварена дыра! Осталось: {currentActiveHoles}, Заварено: {totalPatchedHoles}/{totalSpawnedHoles}");
 
-        patchedHoles++;
-        Debug.Log($"Заварено пробоин: {patchedHoles}/{holesToPatch}");
+        CleanupHolesList();
 
-        spawnedHoles.RemoveAll(h => h == null);
-
-        if (patchedHoles >= holesToPatch)
+        // Проверяем завершение ивента - нужно заделать ВСЕ дыры
+        if (isEventActive && currentActiveHoles == 0)
         {
-            StopHoleEvent();
-            dayEventManager?.CompleteEvent("PatchHoles");
+            Debug.Log($"✅ ВСЕ дыры заделаны! ({totalPatchedHoles}/{totalSpawnedHoles})");
+            
+            if (dayEventManager != null)
+            {
+                dayEventManager.CompleteEvent("PatchHoles");
+            }
+        }
+        else if (isEventActive)
+        {
+            Debug.Log($"⏳ Ещё осталось дыр: {currentActiveHoles}");
         }
     }
+
+    /// <summary>
+    /// Для отображения прогресса в UI
+    /// </summary>
+    public string GetProgressText()
+    {
+        if (!isEventActive)
+            return "Нет активных дыр";
+        
+        if (currentActiveHoles == 0)
+            return $"✅ Все дыры заделаны ({totalPatchedHoles}/{totalSpawnedHoles})";
+        
+        return $"Заделано: {totalPatchedHoles}/{totalSpawnedHoles} | Осталось: {currentActiveHoles}";
+    }
+
+    /// <summary>
+    /// Свойства для совместимости со старым кодом
+    /// </summary>
+    public int patchedHoles => totalPatchedHoles;
+    public int holesToPatch => totalSpawnedHoles;
+
     #endregion
 
     #region Editor Tools
@@ -198,7 +298,6 @@ public List<GameObject> GetActiveHoles()
     {
         List<Transform> wallsToProcess = new List<Transform>();
 
-        // Приоритет: ручной выбор > автоматический поиск
         if (selectedWalls.Count > 0)
         {
             Debug.Log("Используем вручную выбранные стены");
@@ -241,7 +340,6 @@ public List<GameObject> GetActiveHoles()
         {
             if (wall == null) continue;
 
-            // Проверка исключений по имени
             bool shouldExclude = false;
             foreach (string keyword in excludeKeywords)
             {
@@ -264,7 +362,6 @@ public List<GameObject> GetActiveHoles()
                 continue;
             }
 
-            // Фильтр по типу коллайдера
             if (onlyBoxColliders && !(wallCollider is BoxCollider))
             {
                 Debug.Log($"⏭️ Пропускаем {wall.name} ({wallCollider.GetType().Name} - не BoxCollider)");
@@ -272,7 +369,6 @@ public List<GameObject> GetActiveHoles()
                 continue;
             }
 
-            // Создаём зону
             GameObject zoneObj = new GameObject($"SpawnZone_{wall.name}");
             zoneObj.transform.SetParent(zonesParent);
             
@@ -432,8 +528,6 @@ public List<GameObject> GetActiveHoles()
         {
             if (zone == null) continue;
             
-            // Предполагаем что внутрь = вниз по мировой Y
-            // Поворачиваем зону так чтобы её -forward смотрел вниз
             zone.transform.rotation = Quaternion.Euler(90, 0, 0);
             
             Debug.Log($"Исправлен поворот {zone.name}");
@@ -456,7 +550,6 @@ public List<GameObject> GetActiveHoles()
             Transform t = zone.transform;
             Vector3 center = t.TransformPoint(zone.center);
 
-            // Рисуем зону
             Gizmos.color = new Color(0f, 1f, 1f, 0.3f);
             Gizmos.matrix = t.localToWorldMatrix;
             Gizmos.DrawCube(zone.center, zone.size);
@@ -466,12 +559,10 @@ public List<GameObject> GetActiveHoles()
             
             Gizmos.matrix = Matrix4x4.identity;
             
-            // Направление спавна (внутрь помещения) - БОЛЬШАЯ КРАСНАЯ СТРЕЛКА
             Vector3 inwardDirection = -t.forward;
             Gizmos.color = Color.red;
             DrawArrow(center, inwardDirection * 1f);
             
-            // Локальные оси для понимания ориентации (маленькие)
             Gizmos.color = Color.blue;
             Gizmos.DrawRay(center, t.forward * 0.3f);
             
@@ -481,7 +572,6 @@ public List<GameObject> GetActiveHoles()
             Gizmos.color = new Color(1f, 0.5f, 0f);
             Gizmos.DrawRay(center, t.right * 0.3f);
             
-            // Тестовые точки спавна
             Gizmos.color = Color.yellow;
             for (int i = 0; i < 3; i++)
             {
@@ -499,7 +589,6 @@ public List<GameObject> GetActiveHoles()
         }
         
         #if UNITY_EDITOR
-        // Визуализация стен (для отладки)
         if (wallsContainer != null && UnityEditor.Selection.activeGameObject == gameObject)
         {
             Gizmos.color = new Color(0f, 1f, 0f, 0.5f);
@@ -518,45 +607,7 @@ public List<GameObject> GetActiveHoles()
         }
         #endif
     }
-/// <summary>
-/// Публичный метод для создания одной дыры (для GameOverManager)
-/// </summary>
-public void SpawnSingleHole()
-{
-    if (HolePrefab == null)
-    {
-        Debug.LogWarning("HoleSpawner: не назначен HolePrefab!");
-        return;
-    }
 
-    if (wallSpawnZones.Count == 0)
-    {
-        Debug.LogWarning("HoleSpawner: нет зон спавна на стенах!");
-        return;
-    }
-
-    BoxCollider zone = wallSpawnZones[Random.Range(0, wallSpawnZones.Count)];
-    
-    Vector3 spawnPos;
-    Quaternion spawnRot;
-    GetRandomPointOnWall(zone, out spawnPos, out spawnRot);
-
-    GameObject hole = Instantiate(HolePrefab, spawnPos, spawnRot);
-    
-    // Если ивент активен, отслеживаем заваривание
-    if (eventActive)
-    {
-        PatchableHole patchable = hole.GetComponent<PatchableHole>();
-        if (patchable != null)
-        {
-            StartCoroutine(WatchHolePatch(patchable));
-        }
-    }
-    
-    spawnedHoles.Add(hole);
-    
-    Debug.Log($"💥 Создана экстренная пробоина! Всего дыр: {spawnedHoles.Count}");
-}
     private void DrawArrow(Vector3 pos, Vector3 direction)
     {
         Gizmos.DrawRay(pos, direction);

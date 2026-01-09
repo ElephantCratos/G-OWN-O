@@ -152,7 +152,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2989d9332bf5554085d3668d74863f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameSceneName: XR Demo
+  gameSceneName: Game
   menuSpawnPoint: {fileID: 1513633720}
   distanceFromCamera: 1.5
   menuHeight: 1.2
@@ -203,7 +203,7 @@ PrefabInstance:
     - target: {fileID: 2683195716791022646, guid: 4ac7df741a9c0a2418ec19477729ee3d,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.55
+      value: -0.93
       objectReference: {fileID: 0}
     - target: {fileID: 2683195716791022646, guid: 4ac7df741a9c0a2418ec19477729ee3d,
         type: 3}
@@ -515,7 +515,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1513633716}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -12.74, y: -2.71, z: -20.41}
+  m_LocalPosition: {x: -12.74, y: -2.6, z: -20.41}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
