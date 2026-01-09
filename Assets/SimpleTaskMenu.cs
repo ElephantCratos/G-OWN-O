@@ -7,6 +7,7 @@ public class SimpleTaskMenu : MonoBehaviour
 {
     [Header("References")]
     public DayEventManager dayEventManager;
+    public GameOverManager gameOverManager; // НОВОЕ: для статуса систем
     public Transform playerCamera; // VR камера
     
     [Header("Settings")]
@@ -52,6 +53,12 @@ public class SimpleTaskMenu : MonoBehaviour
             }
         }
         
+        // НОВОЕ: Автопоиск GameOverManager
+        if (gameOverManager == null)
+        {
+            gameOverManager = FindObjectOfType<GameOverManager>();
+        }
+        
         CreateSimpleUI();
         HideMenu();
         
@@ -69,7 +76,7 @@ public class SimpleTaskMenu : MonoBehaviour
         scaler.dynamicPixelsPerUnit = 10;
         
         RectTransform canvasRect = canvas.GetComponent<RectTransform>();
-        canvasRect.sizeDelta = new Vector2(800, 600);
+        canvasRect.sizeDelta = new Vector2(900, 700); // ИЗМЕНЕНО: увеличен размер
         canvasRect.localScale = Vector3.one * 0.001f;
         
         // Создаём панель
@@ -89,7 +96,7 @@ public class SimpleTaskMenu : MonoBehaviour
         textObj.transform.SetParent(menuPanel.transform, false);
         
         contentText = textObj.AddComponent<TextMeshProUGUI>();
-        contentText.fontSize = 32;
+        contentText.fontSize = 28; // ИЗМЕНЕНО: уменьшен размер шрифта
         contentText.color = Color.white;
         contentText.alignment = TextAlignmentOptions.TopLeft;
         
@@ -120,10 +127,11 @@ public class SimpleTaskMenu : MonoBehaviour
             ToggleMenu();
         }
         
-        // Обновляем позицию меню если оно видимо
+        // Обновляем позицию и содержимое меню если оно видимо
         if (isVisible && canvas != null && playerCamera != null)
         {
             UpdateMenuPosition();
+            UpdateMenuContent(); // НОВОЕ: постоянное обновление контента
         }
     }
     
@@ -182,22 +190,36 @@ public class SimpleTaskMenu : MonoBehaviour
     {
         if (contentText == null || dayEventManager == null) return;
         
-        string text = $"<b><size=48>ДЕНЬ {dayEventManager.currentDay}</size></b>\n\n";
+        string text = $"<b><size=44>📋 ДЕНЬ {dayEventManager.currentDay}</size></b>\n\n";
+        
+        // НОВОЕ: Статус систем корабля
+        text += GetSystemsStatus() + "\n";
+        
+        // НОВОЕ: Активные таймеры
+        text += GetActiveTimers() + "\n";
+        
+        // Задания
+        text += "<b><size=36>ЗАДАНИЯ НА ДЕНЬ:</size></b>\n";
         
         if (dayEventManager.todayEvents.Count == 0)
         {
-            text += "<color=yellow>Нет заданий на сегодня</color>";
+            text += "<color=yellow>Нет заданий на сегодня</color>\n";
         }
         else
         {
             int completed = 0;
             foreach (var task in dayEventManager.todayEvents)
             {
-                string status = task.isCompleted ? "<color=green>✓ ВЫПОЛНЕНО</color>" : "<color=red>○ В процессе</color>";
+                string status = task.isCompleted ? "<color=green>✓</color>" : "<color=red>○</color>";
                 string taskName = GetTaskName(task.eventName);
                 
-                text += $"{status}  {taskName}\n";
-                text += GetTaskProgress(task.eventName) + "\n\n";
+                text += $"{status} {taskName}\n";
+                
+                string progress = GetTaskProgress(task.eventName);
+                if (!string.IsNullOrEmpty(progress))
+                {
+                    text += $"  {progress}\n";
+                }
                 
                 if (task.isCompleted) completed++;
             }
@@ -206,6 +228,90 @@ public class SimpleTaskMenu : MonoBehaviour
         }
         
         contentText.text = text;
+    }
+    
+    // НОВОЕ: Получение статуса систем
+    string GetSystemsStatus()
+    {
+        if (gameOverManager == null) return "";
+        
+        string status = "<b><size=36>⚙️ СИСТЕМЫ КОРАБЛЯ:</size></b>\n";
+        
+        // Герметичность
+        float hull = gameOverManager.hullIntegrity;
+        string hullColor = hull > 50f ? "green" : (hull > 25f ? "yellow" : "red");
+        status += $"<color={hullColor}>🛡️ Герметичность: {hull:F0}%</color>\n";
+        
+        // Здоровье
+        float health = gameOverManager.playerHealth;
+        string healthColor = health > 50f ? "green" : (health > 25f ? "yellow" : "red");
+        status += $"<color={healthColor}>❤️ Здоровье: {health:F0}/{gameOverManager.maxPlayerHealth:F0}</color>\n";
+        
+        // Кислород
+        float oxygen = gameOverManager.oxygenLevel;
+        string oxygenColor = oxygen > 50f ? "green" : (oxygen > 25f ? "yellow" : "red");
+        status += $"<color={oxygenColor}>💨 Кислород: {oxygen:F0}%</color>\n";
+        
+        // Крысы рядом
+        int rats = gameOverManager.GetNearbyRatsCount();
+        if (rats > 0)
+        {
+            status += $"<color=red>🐀 Крыс рядом: {rats}</color>\n";
+        }
+        
+        return status;
+    }
+    
+    // НОВОЕ: Получение активных таймеров
+    string GetActiveTimers()
+    {
+        if (gameOverManager == null) return "";
+        
+        string timers = "";
+        bool hasTimers = false;
+        
+        // Таймер управления
+        var controlTimer = gameOverManager.GetControlTimer();
+        if (controlTimer.isActive)
+        {
+            if (!hasTimers)
+            {
+                timers += "<b><size=36>⏰ КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
+                hasTimers = true;
+            }
+            
+            float remaining = controlTimer.GetRemainingTime();
+            string color = remaining > 30f ? "yellow" : "red";
+            timers += $"<color={color}>⚠️ Панель управления: {FormatTime(remaining)}</color>\n";
+        }
+        
+        // Таймер батареи
+        var batteryTimer = gameOverManager.GetBatteryTimer();
+        if (batteryTimer.isActive)
+        {
+            if (!hasTimers)
+            {
+                timers += "<b><size=36>⏰ КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
+                hasTimers = true;
+            }
+            
+            float elapsed = batteryTimer.currentTime;
+            string color = elapsed < 15f ? "yellow" : "red";
+            timers += $"<color={color}>🔋 Разряженная батарея: {elapsed:F0}с</color>\n";
+        }
+        
+        return hasTimers ? timers : "";
+    }
+    
+    // НОВОЕ: Форматирование времени
+    string FormatTime(float seconds)
+    {
+        if (seconds < 0) return "00:00";
+        
+        int mins = Mathf.FloorToInt(seconds / 60f);
+        int secs = Mathf.FloorToInt(seconds % 60f);
+        
+        return $"{mins:D2}:{secs:D2}";
     }
     
     string GetTaskName(string eventName)
@@ -228,15 +334,14 @@ public class SimpleTaskMenu : MonoBehaviour
         {
             RatSpawner spawner = FindObjectOfType<RatSpawner>();
             if (spawner != null)
-                return $"   Убито: {spawner.killedRats}/{spawner.ratsToKill}";
+                return $"Убито: {spawner.killedRats}/{spawner.ratsToKill}";
         }
         else if (eventName == "PatchHoles")
         {
             HoleSpawner spawner = FindObjectOfType<HoleSpawner>();
             if (spawner != null)
             {
-                // ИСПРАВЛЕНО: Используем новый унифицированный метод
-                return $"   {spawner.GetProgressText()}";
+                return spawner.GetProgressText();
             }
         }
         else if (eventName == "FixControls")
@@ -245,22 +350,22 @@ public class SimpleTaskMenu : MonoBehaviour
             if (panel != null)
             {
                 if (panel.IsCurrentlyFixed())
-                    return "   <color=green>Параметры в норме</color>";
+                    return "<color=green>Параметры в норме</color>";
                 else
-                    return "   <color=yellow>Требуется настройка</color>";
+                    return "<color=yellow>Требуется настройка</color>";
             }
         }
         else if (eventName == "ReplacePins")
         {
             PinReplacementTask pins = FindObjectOfType<PinReplacementTask>();
             if (pins != null)
-                return "   " + pins.GetProgressText();
+                return pins.GetProgressText();
         }
         else if (eventName == "ReplaceBattery")
         {
             BatteryReplacementEvent battery = FindObjectOfType<BatteryReplacementEvent>();
             if (battery != null)
-                return "   " + battery.GetStatus();
+                return battery.GetStatus();
         }
         
         return "";
