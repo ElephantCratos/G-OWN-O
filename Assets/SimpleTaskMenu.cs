@@ -76,7 +76,7 @@ public class SimpleTaskMenu : MonoBehaviour
         scaler.dynamicPixelsPerUnit = 10;
         
         RectTransform canvasRect = canvas.GetComponent<RectTransform>();
-        canvasRect.sizeDelta = new Vector2(900, 700); // ИЗМЕНЕНО: увеличен размер
+        canvasRect.sizeDelta = new Vector2(900, 1100); // ИЗМЕНЕНО: увеличен размер
         canvasRect.localScale = Vector3.one * 0.001f;
         
         // Создаём панель
@@ -235,28 +235,28 @@ public class SimpleTaskMenu : MonoBehaviour
     {
         if (gameOverManager == null) return "";
         
-        string status = "<b><size=36>⚙️ СИСТЕМЫ КОРАБЛЯ:</size></b>\n";
+        string status = "<b><size=36>СИСТЕМЫ КОРАБЛЯ:</size></b>\n";
         
         // Герметичность
         float hull = gameOverManager.hullIntegrity;
         string hullColor = hull > 50f ? "green" : (hull > 25f ? "yellow" : "red");
-        status += $"<color={hullColor}>🛡️ Герметичность: {hull:F0}%</color>\n";
+        status += $"<color={hullColor}>Герметичность: {hull:F0}%</color>\n";
         
         // Здоровье
         float health = gameOverManager.playerHealth;
         string healthColor = health > 50f ? "green" : (health > 25f ? "yellow" : "red");
-        status += $"<color={healthColor}>❤️ Здоровье: {health:F0}/{gameOverManager.maxPlayerHealth:F0}</color>\n";
+        status += $"<color={healthColor}>Здоровье: {health:F0}/{gameOverManager.maxPlayerHealth:F0}</color>\n";
         
         // Кислород
         float oxygen = gameOverManager.oxygenLevel;
         string oxygenColor = oxygen > 50f ? "green" : (oxygen > 25f ? "yellow" : "red");
-        status += $"<color={oxygenColor}>💨 Кислород: {oxygen:F0}%</color>\n";
+        status += $"<color={oxygenColor}>Кислород: {oxygen:F0}%</color>\n";
         
         // Крысы рядом
         int rats = gameOverManager.GetNearbyRatsCount();
         if (rats > 0)
         {
-            status += $"<color=red>🐀 Крыс рядом: {rats}</color>\n";
+            status += $"<color=red>Крыс рядом: {rats}</color>\n";
         }
         
         return status;
@@ -276,13 +276,13 @@ public class SimpleTaskMenu : MonoBehaviour
         {
             if (!hasTimers)
             {
-                timers += "<b><size=36>⏰ КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
+                timers += "<b><size=36>КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
                 hasTimers = true;
             }
             
             float remaining = controlTimer.GetRemainingTime();
             string color = remaining > 30f ? "yellow" : "red";
-            timers += $"<color={color}>⚠️ Панель управления: {FormatTime(remaining)}</color>\n";
+            timers += $"<color={color}>Панель управления: {FormatTime(remaining)}</color>\n";
         }
         
         // Таймер батареи
@@ -291,13 +291,13 @@ public class SimpleTaskMenu : MonoBehaviour
         {
             if (!hasTimers)
             {
-                timers += "<b><size=36>⏰ КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
+                timers += "<b><size=36>КРИТИЧЕСКИЕ ТАЙМЕРЫ:</size></b>\n";
                 hasTimers = true;
             }
             
             float elapsed = batteryTimer.currentTime;
             string color = elapsed < 15f ? "yellow" : "red";
-            timers += $"<color={color}>🔋 Разряженная батарея: {elapsed:F0}с</color>\n";
+            timers += $"<color={color}>Разряженная батарея: {elapsed:F0}с</color>\n";
         }
         
         return hasTimers ? timers : "";
@@ -318,11 +318,11 @@ public class SimpleTaskMenu : MonoBehaviour
     {
         switch (eventName)
         {
-            case "ClearRats": return "Уничтожить крыс";
-            case "PatchHoles": return "Залатать пробоины";
-            case "FixControls": return "Починить панель управления";
-            case "ReplacePins": return "Заменить пины";
-            case "ReplaceBattery": return "Заменить батарею";
+            case "ClearRats": return "<b><size=36>Уничтожить крыс</size></b>";
+            case "PatchHoles": return "<b><size=36>Залатать пробоины</size></b>";
+            case "FixControls": return "<b><size=36>Починить панель управления</size></b>";
+            case "ReplacePins": return "<b><size=36>Заменить пины</size></b>";
+            case "ReplaceBattery": return "<b><size=36>Заменить батарею</size></b>";
             default: return eventName;
         }
     }

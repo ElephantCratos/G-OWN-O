@@ -88,18 +88,11 @@ public class GamePauseMenu : MonoBehaviour
 
     bool IsMenuButtonPressed()
     {
-        if (useKeyboard && Input.GetKeyDown(keyboardKey))
-            return true;
-
+        if (useKeyboard && Input.GetKeyDown(keyboardKey)) return true;
         if (input == null)
             return false;
 
-        if (useRightController && input.StartButtonDown)
-            return true;
-
-        if (useLeftController && input.BackButtonDown)
-            return true;
-
+        if (useRightController && input.BButtonDown) return true;
         return false;
     }
 
